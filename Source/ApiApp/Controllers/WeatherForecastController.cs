@@ -1,3 +1,5 @@
+using ApiApp.Services;
+using Azure.Storage.Files.DataLake;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Identity.Web.Resource;
@@ -7,7 +9,7 @@ namespace ApiApp.Controllers;
 [Authorize]
 [ApiController]
 [Route("[controller]")]
-[RequiredScope(RequiredScopesConfigurationKey = "AzureAd:Scopes")]
+//[RequiredScope(RequiredScopesConfigurationKey = "AzureAd:Scopes")]
 public class WeatherForecastController : ControllerBase
 {
     private static readonly string[] Summaries = new[]
@@ -32,5 +34,18 @@ public class WeatherForecastController : ControllerBase
             Summary = Summaries[Random.Shared.Next(Summaries.Length)]
         })
         .ToArray();
+    }
+
+    [HttpGet("/fileData")]
+    public Stream GetDataLakeFile()
+    {
+        var isIt = User.Identity?.IsAuthenticated;
+
+        DataLakeServiceClient? dataLakeClient = null;
+        MyDataLakeServices.GetDataLakeServiceClient(ref dataLakeClient, "oauth2oboflowdemost47", "", "", "", "");
+
+        var fsClient = dataLakeClient.GetFileSystemClient("");
+        var fileClient = fsClient.GetFileClient("fileName");
+        return fileClient.OpenRead();
     }
 }
