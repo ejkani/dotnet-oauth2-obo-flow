@@ -113,6 +113,26 @@ az webapp create `
   --runtime "DOTNET:6.0" `
   --resource-group $resourceGroup
 
+```
+
+## Creating app identities
+
+```Powershell
+az ad app create `
+    --display-name $apiAppMsi `
+    --reply-urls $apiAppLocalUrl $apiAppPublicUrl
+    # --identifier-uris $apiAppLocalUrl $apiAppPublicUrl # NOTE: You can use this if you use your domain verified domain name
+
+$apiAppId=$(az ad app list --display-name $apiAppMsi --query "[*].[appId]" --output tsv)
+
+az ad app create `
+    --display-name $webAppMsi
+    # --reply-urls <NOT APPLICABLE HERE> # NOTE: Setting reply urls further down, since we need to set the type to "Spa" as well.
+    # --identifier-uris $apiAppLocalUrl $apiAppPublicUrl # NOTE: You can use this if you use your domain verified domain name
+
+$webAppObjectId=$(az ad app list --display-name $webAppMsi --query "[*].[objectId]" --output tsv)
+$webAppId=$(az ad app list --display-name $webAppMsi --query "[*].[appId]" --output tsv)
+
 # Updating the Apps created, since the "az webapp" command has some limitations.
 # Creating a Json object to use in our MS Graph Ad-App Patch call.
 $webAppUpdateRequest = @{
@@ -138,26 +158,6 @@ az rest --method GET --uri "https://graph.microsoft.com/v1.0/applications/$webAp
 
 ```
 
-## Creating app identities
-
-```Powershell
-az ad app create `
-    --display-name $apiAppMsi `
-    --reply-urls $apiAppLocalUrl $apiAppPublicUrl
-    # --identifier-uris $apiAppLocalUrl $apiAppPublicUrl # NOTE: You can use this if you use your domain verified domain name
-
-$apiAppId=$(az ad app list --display-name $apiAppMsi --query "[*].[appId]" --output tsv)
-
-az ad app create `
-    --display-name $webAppMsi
-    # --reply-urls <NOT APPLICABLE HERE> # NOTE: Setting reply urls further down, since we need to set the type to "Spa" as well.
-    # --identifier-uris $apiAppLocalUrl $apiAppPublicUrl # NOTE: You can use this if you use your domain verified domain name
-
-$webAppObjectId=$(az ad app list --display-name $webAppMsi --query "[*].[objectId]" --output tsv)
-$webAppId=$(az ad app list --display-name $webAppMsi --query "[*].[appId]" --output tsv)
-
-```
-
 ## Creating the app projects
 
 > The apps are already created in this repository, but if you would like to start fresh, here are some commands to get you started.
@@ -180,12 +180,52 @@ dotnet new blazorwasm `
     --auth SingleOrg `
     --client-id $webAppId `
     --tenant-id $tenantId
-    --reply-urls-with-type @
 
 dotnet new sln
 Rename-Item -Path Source.sln -NewName "$myDemoNamePrefix.sln"
 dotnet sln add "ApiApp"
 dotnet sln add "WebApp"
+
+# Create launch settings json files
+$webAppLaunchSettings = @{
+  profiles = @{
+    WebApp = @{
+      commandName = "Project"
+      dotnetRunMessages = $true
+      launchBrowser = $true
+      inspectUri = "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}"
+      applicationUrl = "$webAppLocalUrl"
+      environmentVariables = @{
+        ASPNETCORE_ENVIRONMENT= "Development"
+      }
+    }
+  }
+}
+
+# Write json file to VS Project
+$webAppLaunchSettings | ConvertTo-Json -Depth 10 | Out-File "./WebApp/Properties/launchSettings.json" -Force
+
+$apiAppLaunchSettings = @{
+  profiles = @{
+    WebApp = @{
+      commandName = "Project"
+      dotnetRunMessages = $true
+      launchBrowser = $true
+      inspectUri = "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}"
+      applicationUrl = "$apiAppLocalUrl"
+      environmentVariables = @{
+        ASPNETCORE_ENVIRONMENT= "Development"
+      }
+    }
+  }
+}
+
+# Write json file to VS Project
+$apiAppLaunchSettings | ConvertTo-Json -Depth 10 | Out-File "./ApiApp/Properties/launchSettings.json" -Force
+
+
+
+
 cd ..
 ```
 
