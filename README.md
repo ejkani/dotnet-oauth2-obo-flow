@@ -266,6 +266,33 @@ cd ..
 
 ```
 
+## Create a Json file with test data
+
+```Powershell
+
+$testData = @(
+    @{
+      theId = "id1"
+      theValue = "value1"
+    },
+    @{
+      theId = "id2"
+      theValue = "value2"
+    }
+)
+
+$testDataFilePath = "./TestData/testData.json"
+$testData | ConvertTo-Json -Depth 2 | Out-File ( New-Item -Path $testDataFilePath -Force )
+
+# Upload this file to the Azure Storage (Gen2) that has been created.
+az storage fs file upload `
+    --source $testDataFilePath `
+    --file-system "laketest1" `
+    --path "folder1/testData.json" `
+    --account-name $storageAccountName
+
+```
+
 ## Publish Web App with zip-deployment
 
 ```Powershell
