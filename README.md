@@ -119,9 +119,12 @@ az webapp create `
 
 ```Powershell
 az ad app create `
-    --display-name $apiAppMsi `
-    --reply-urls $apiAppLocalUrl $apiAppPublicUrl
+    --display-name $apiAppMsi
+    # --reply-urls $apiAppLocalUrl $apiAppPublicUrl # TODO: Seems like it's not needed. Maybe when enabling login with Swagger UI ...
     # --identifier-uris $apiAppLocalUrl $apiAppPublicUrl # NOTE: You can use this if you use your domain verified domain name
+
+# TODO: Add API Permission: Microsoft Graph/User.Read when creating app
+# ...
 
 $apiAppId=$(az ad app list --display-name $apiAppMsi --query "[*].[appId]" --output tsv)
 
@@ -132,6 +135,16 @@ az ad app create `
 
 $webAppObjectId=$(az ad app list --display-name $webAppMsi --query "[*].[objectId]" --output tsv)
 $webAppId=$(az ad app list --display-name $webAppMsi --query "[*].[appId]" --output tsv)
+
+# TODO: Create Service Principal for the ApiApi to be able to expose API Permissions to the WebApp
+# ... check if this is really needed. Not sure it is.
+
+# TODO: Uncheck ID Token option when creating web app
+# ...
+
+# TODO: Remove Scopes/user_impersonation
+# ...
+
 
 # Updating the Apps created, since the "az webapp" command has some limitations.
 # Creating a Json object to use in our MS Graph Ad-App Patch call.
@@ -178,11 +191,22 @@ dotnet new webapi `
     --client-id $apiAppId `
     --tenant-id $tenantId
 
+# dotnet new blazorwasm `
+#     -n "WebApp" `
+#     --framework net6.0 `
+#     --auth SingleOrg `
+#     --client-id $webAppId `
+#     --tenant-id $tenantId
+
 dotnet new blazorwasm `
-    -n "WebApp" `
+    -n "WebApp2" `
     --framework net6.0 `
     --auth SingleOrg `
+    --api-client-id $apiAppId `
+    --app-id-uri "api://$apiAppId" `
     --client-id $webAppId `
+    --default-scope "./default" `
+    --domain "my-domain.com" `
     --tenant-id $tenantId
 
 dotnet new sln
@@ -260,7 +284,7 @@ Invoke-Expression ('$apiAppSettings.AzureAd.TenantId = "$tenantId"')
 Invoke-Expression ('$apiAppSettings.AzureAd.ClientId = "$apiAppId"')
 
 # Write back the appsettings.json file
-$webAppSettings | ConvertTo-Json -Depth 10 | Out-File "./ApiApp/appsettings.json" -Force
+$apiAppSettings | ConvertTo-Json -Depth 10 | Out-File "./ApiApp/appsettings.json" -Force
 
 cd ..
 
