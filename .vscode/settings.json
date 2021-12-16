@@ -8,10 +8,12 @@
     "cSpell.words": [
         "appi",
         "appservice",
+        "appsettings",
         "blazorwasm",
         "drawio",
         "runtimes",
         "webapi",
-        "westeurope"
+        "westeurope",
+        "wwwroot"
     ]
 }

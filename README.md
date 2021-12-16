@@ -158,9 +158,13 @@ az rest --method GET --uri "https://graph.microsoft.com/v1.0/applications/$webAp
 
 ```
 
-## Creating the app projects
+## Chose to create apps from scratch or use existing apps from this repo
 
-> The apps are already created in this repository, but if you would like to start fresh, here are some commands to get you started.
+> The apps are already created in this repository, but if you would like to start fresh, choose `Alt 1`.
+
+## Alt 1: Creating the app projects from scratch
+
+If you created the projects from scratch, remember that you also need to write the application code as well (or copy from this repo)...
 
 ```Powershell
 cd ./Source
@@ -223,13 +227,44 @@ $apiAppLaunchSettings = @{
 # Write json file to VS Project
 $apiAppLaunchSettings | ConvertTo-Json -Depth 10 | Out-File "./ApiApp/Properties/launchSettings.json" -Force
 
-
-
-
 cd ..
 ```
 
-> If you created the projects from scratch, remember that you also need to write the application code as well (or copy from this repo)...
+## Alt 2: Use existing projects
+
+### Set TenantId and ClientIds when using existing solution from this Git repo
+
+```Powershell
+
+# TODO: Create replace script for json ...
+
+cd ./Source
+
+$tenantId = $(az account show --query "tenantId" --output tsv)
+
+# Setting the WebApp first
+$webAppSettings = (Get-Content ("./WebApp/wwwroot/appsettings.json") | ConvertFrom-Json)
+
+# Set values
+Invoke-Expression ('$webAppSettings.AzureAd.Authority = "https://login.microsoftonline.com/$tenantId"')
+Invoke-Expression ('$webAppSettings.AzureAd.ClientId = "$webAppId"')
+
+# Write back the appsettings.json file
+$webAppSettings | ConvertTo-Json -Depth 10 | Out-File "./WebApp/wwwroot/appsettings.json" -Force
+
+# Then setting the Api App settings
+$apiAppSettings = (Get-Content ("./ApiApp/appsettings.json") | ConvertFrom-Json)
+
+# Set values
+Invoke-Expression ('$apiAppSettings.AzureAd.TenantId = "$tenantId"')
+Invoke-Expression ('$apiAppSettings.AzureAd.ClientId = "$apiAppId"')
+
+# Write back the appsettings.json file
+$webAppSettings | ConvertTo-Json -Depth 10 | Out-File "./ApiApp/appsettings.json" -Force
+
+cd ..
+
+```
 
 ## Publish Web App with zip-deployment
 
