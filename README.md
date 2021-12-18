@@ -268,6 +268,8 @@ az webapp create `
 
 ## 1.9. Creating app identities
 
+### 1.9.1. Creating the ApiApp
+
 ```Powershell
 az ad app create `
     --display-name $apiAppMsi
@@ -277,10 +279,18 @@ az ad app create `
 # TODO: Add API Permission: Microsoft Graph/User.Read when creating app
 # ...
 
+# TODO: Add API Permission: Azure Storage / user_impersonation
+# ...
+
 $apiAppObjectId=$(az ad app list --display-name $apiAppMsi --query "[*].[objectId]" --output tsv)
 $apiAppId=$(az ad app list --display-name $apiAppMsi --query "[*].[appId]" --output tsv)
 $apiAppSecret = az ad app credential reset --id $apiAppObjectId --credential-description "Demo secret" --append --query "password" --output tsv
 
+```
+
+### 1.9.2. Creating the WebApp
+
+```Powershell
 
 az ad app create `
     --display-name $webAppMsi
@@ -517,6 +527,40 @@ az webapp deployment source config-zip `
   -g $resourceGroup `
   -n $apiAppName `
   --src $apiAppPublishZip
+
+```
+
+## 1.14. Save used variables
+
+Saving some key variables, so we easily can clean up our demo resources later
+
+```Powershell
+
+$demoDataFilePath = "./demoData.json"
+
+$demoData = @(
+    @{
+      resourceGroup = $resourceGroup
+      apiAppName    = $apiAppName
+      webAppName    = $webAppName
+      adGroupName   = $apiAppMsi
+    }
+)
+
+$demoData | ConvertTo-Json -Depth 2 | Out-File ( New-Item -Path $demoDataFilePath -Force )
+
+```
+
+### 1.14.1. Deleting resources
+
+```Powershell
+
+$demoDataFilePath = "./demoData.json"
+
+$currentDemoData = (Get-Content ($demoDataFilePath) | ConvertFrom-Json)
+
+# TODO: Delete resources based on demo data
+# ...
 
 ```
 
