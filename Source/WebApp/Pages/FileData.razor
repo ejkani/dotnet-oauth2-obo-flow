@@ -1,0 +1,117 @@
+﻿@using Microsoft.AspNetCore.Authorization
+@using System.Text.Json
+
+@attribute [Authorize]
+@page "/filedata"
+
+@inject HttpClient HttpClient
+@inject WeatherForecastHttpClient _http
+
+<PageTitle>File Data based on OBO Flow Access</PageTitle>
+
+<h1>File Data</h1>
+
+<p>This component demonstrates fetching File Data based on OAuth2 OnBehalfOf-Flow Access down to a Azure Data Lake with ACL implemented</p>
+
+<button type="button" @onclick="Get2">Get data</button>
+<button type="button" @onclick="Stop">Cancel</button>
+
+<p>Bytes read: @byteCount</p>
+
+<pre>
+    <code>@_responseJson</code>
+</pre>
+
+<h4>Update your access</h4>
+<i>note that the properties in these powershell script blocks are dependent on the setup steps in this solution.</i>
+<pre>
+    <code>
+# ------------------------------------------------------------------------
+# Add your user to the AD Group
+# ------------------------------------------------------------------------
+az ad group member add `
+    --group $adGroupForAccessObjectId `
+    --member-id $currentUserObjectId
+
+# ------------------------------------------------------------------------
+# List members in AD Group
+# ------------------------------------------------------------------------
+az ad group member list `
+    --group  $adGroupForAccessObjectId `
+    --query "[].{objectId:objectId, userPrincipalName:userPrincipalName}" --out table
+
+# ------------------------------------------------------------------------
+# Remove your user and see that you no longer have access to the file.
+# ------------------------------------------------------------------------
+az ad group member remove `
+    --group $adGroupForAccessObjectId `
+    --member-id $currentUserObjectId
+
+    </code>
+</pre>
+
+@code {
+    int byteCount;
+    CancellationTokenSource cts;
+    private string _responseJson;
+
+    protected override async Task OnInitializedAsync()
+    {
+        //await _http.GetFileDataAsync();
+    }
+
+    /// <summary>
+    /// https://www.meziantou.net/streaming-an-http-response-in-blazor-webassembly.htm
+    /// https://code-maze.com/using-streams-with-httpclient-to-improve-performance-and-memory-usage/
+    /// </summary>
+    /// <returns></returns>
+    async Task Get()
+    {
+        cts = new CancellationTokenSource();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "filedata");
+        request.SetBrowserResponseStreamingEnabled(true); // Enable response streaming
+
+        // Be sure to use HttpCompletionOption.ResponseHeadersRead
+        using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        using var stream = await response.Content.ReadAsStreamAsync();
+
+        // Read the response chunk by chunk and count the number of bytes
+        var bytes = new byte[10];
+        while (!cts.Token.IsCancellationRequested)
+        {
+            var read = await stream.ReadAsync(bytes, cts.Token);
+            if (read == 0) // End of stream
+                return;
+
+            byteCount += read;
+
+            // Update the UI
+            StateHasChanged();
+            await Task.Delay(1);
+        }
+    }
+
+    async Task Get2()
+    {
+
+        _responseJson = await _http.GetStreamingFileData();
+    //    using var request = new HttpRequestMessage(HttpMethod.Get, "filedata");
+    //    request.SetBrowserResponseStreamingEnabled(true); // Enable response streaming
+
+    //    using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+    //    response.EnsureSuccessStatusCode();
+
+    //    if (response.Content is object)
+    //    {
+    //        _responseJson = await response.Content.ReadAsStringAsync();
+    ////var stream = await response.Content.ReadAsStreamAsync();
+    ////var data = await JsonSerializer.DeserializeAsync<List<Book>>(stream);
+    //// do something with the data or return it
+    //    }
+    }
+
+    // Cancel the request
+    void Stop() => cts?.Cancel();
+}

@@ -28,9 +28,9 @@ namespace ApiApp.Services
 
             //TokenCredential credential = new ClientSecretCredential(tenantID, clientID, clientSecret, new TokenCredentialOptions());
             TokenCredential credential = new OnBehalfOfCredential(
-                "30397c79-d7a7-4b10-ae41-24df759a3ea6", 
-                "5d15b3a2-cdc6-4020-b538-114d13a65274", 
-                "Xml7Q~HquOpS60DDQHMqAp-AWb-tYjmsekBGQ",
+                tenantID,
+                clientID,
+                clientSecret,
                 accessToken);
 
             //var managedCredential = new ManagedIdentityCredential("clientId");

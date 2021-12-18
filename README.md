@@ -1,4 +1,4 @@
-# OAuth2 OBO Flow - On-behalf-of Flow in DotNet
+# 1. OAuth2 OBO Flow - On-behalf-of Flow in DotNet
 
 Showcasing an Azure AD On-Behalf-Of (OBO) OAuth2 Flow.
 
@@ -6,11 +6,42 @@ When an api doesn't own its resources or the access to those, it is sometime han
 
 ![Obo Sequence Diagram](./Docs/Diagrams/oauth2-obo-flow.drawio.svg)
 
+References:
+
+* <https://docs.microsoft.com/en-us/azure/active-directory/develop/scenario-web-api-call-api-acquire-token?tabs=aspnetcore>
+* <https://github.com/Azure/azure-sdk-for-net/issues/16264>
+
 **NOTE:**
 
 * All steps below are executed from the root folder (the same folder as this README file)
-  
-## Create shared Azure Resources
+
+## 1.1. Intro
+
+### 1.1.1. Admin Consents
+
+> Note that you need to have administration rights in your Tenant to grant admin consent.
+
+When calling underlying services, the user has no way of consenting in use of the api/service.
+So in this case when the api is calling the Storage from the API on behalf of the user, we **need to add Admin Consent** to `Azure Storage / user_impersonation`.
+The scripts below gives you an example on how to do that programmatically.
+
+If admin consent isn't given, this will typically be your error.
+
+```TXT
+OnBehalfOfCredential authentication failed.
+
+The user or administrator has not consented to use the application
+with ID '<appId>' named '<appName>'.
+Send an interactive authorization request for this user and resource.
+```
+
+#### 1.1.1.1. Setting Admin consent
+
+This will be done later, but this is showing where the Admin Consent is set for the Api we are creating.
+
+![Admin Consent UI](./Docs/Images/azure-app-admin-consent.png)
+
+## 1.2. Log In To Azure And Set Your Default Subscription
 
 > Upgrade `az cli` with `az upgrade`, since some validation lies within the tool itself.
 
@@ -28,6 +59,11 @@ az account list --query "[].{name:name, subscriptionId:id}"
 # Set you Azure Subscription name and preferred resource location
 # ------------------------------------------------------------------
 $subscriptionName      = "<YOUR_AZURE_SUBSCRIPTION_NAME>"
+```
+
+## 1.3. Start setting variables we're going to use
+
+```Powershell
 $location              = "westeurope"
 $myDemoNamePrefix      = "oauth2-obo-flow-demo"
 $myDemoNamePrefixShort = $myDemoNamePrefix -replace "-"
@@ -39,6 +75,7 @@ $storageAccountName = "${myDemoNamePrefixShort}st$rand"
 $logWorkspaceName   = "${myDemoNamePrefix}-log-$rand"
 $appInsightsName    = "${myDemoNamePrefix}-appi-$rand"
 $appPlanName        = "${myDemoNamePrefix}-app-plan-$rand"
+$adGroupForAccess   = "$myDemoNamePrefix-adgroup-$rand"
 
 $apiAppName      = "${myDemoNamePrefix}-api-app-$rand"
 $apiAppMsi       = "${myDemoNamePrefix}-api-msi-$rand"
@@ -51,6 +88,11 @@ $webAppMsi       = "${myDemoNamePrefix}-web-msi-$rand"
 $webAppLocalUrl  = "https://localhost:7051"
 $webAppPublicUrl = "https://$webAppName.azurewebsites.net"
 
+# NOTE: The Container(File System) name needs to be lowercase.
+$storageContainerName  = "myfilesystem"
+$storageTestFolder     = "Folder2"
+$storageTestFilePath   = "$storageTestFolder/TestFile.json"
+$localTestDataFilePath = "./TestData/testData.json"
 
 # Then set the subscription name explicitly.
 az account set -s "$subscriptionName"
@@ -58,18 +100,121 @@ az account set -s "$subscriptionName"
 # Verify that you set the correct subscription
 az account show
 
+```
+
+## 1.4. Start creating resources
+
+```Powershell
+
 az group create -n $resourceGroup -l $location
 
+# ---------------------------------------------------------------------
+# Creating file system and folder structure
+# ---------------------------------------------------------------------
 # Create storage account. Be patient, this could take some seconds.
 az storage account create `
-  -n $storageAccountName `
-  -l $location `
-  -g $resourceGroup `
+  --name $storageAccountName `
+  --location $location `
+  --resource-group $resourceGroup `
   --sku Standard_LRS `
   --kind StorageV2 `
   --enable-hierarchical-namespace true
 
+# Create the file system (Container)
+az storage container create `
+    --name $storageContainerName `
+    --account-name $storageAccountName `
+    --public-access off `
+    --resource-group $resourceGroup
 
+# Need to install an extension to be able to create folders for now
+az extension add -n storage-preview
+
+az storage blob directory create `
+    --container-name $storageContainerName `
+    --directory-path $storageTestFolder `
+    --account-name $storageAccountName
+
+```
+
+## 1.5. Creating Azure AD Group and adding you as a member
+
+```Powershell
+
+# ---------------------------------------------------------------------
+# Create Azure AD Group with members
+# ---------------------------------------------------------------------
+# Create an AD Group to manage ACL Access. TODO: Move to own chapter
+az ad group create --display-name $adGroupForAccess --mail-nickname $adGroupForAccess
+$adGroupForAccessObjectId = $(az ad group list --display-name $adGroupForAccess --query "[*].[objectId]" --output tsv)
+
+# Adding you to the created group
+$currentUserObjectId = $(az ad signed-in-user show --query "objectId" --output tsv)
+
+az ad group member add `
+    --group $adGroupForAccessObjectId `
+    --member-id $currentUserObjectId
+
+```
+
+### 1.5.1. Remove current user from AD Group
+
+```Powershell
+
+# List members before removal
+az ad group member list `
+    --group  $adGroupForAccessObjectId `
+    --query "[].{objectId:objectId, userPrincipalName:userPrincipalName}" --out table
+
+az ad group member remove `
+    --group $adGroupForAccessObjectId `
+    --member-id $currentUserObjectId
+
+# List members after removal. Not formatting as table, so you would only see an empty array bracket.
+az ad group member list `
+    --group  $adGroupForAccessObjectId `
+    --query "[].{objectId:objectId, userPrincipalName:userPrincipalName}"
+
+```
+
+## 1.6. Setting Access to Azure Storage files and folders
+
+```Powershell
+
+# ---------------------------------------------------------------------
+# Set access to storage folders and files (ACL access and default access)
+# ---------------------------------------------------------------------
+
+# We are not using RBAC (Role Based Access) but more fine grained access with ACL (Access Control Lists)
+az storage fs access set `
+    --acl "user::rwx,group::r-x,group:${adGroupForAccessObjectId}:r-x,mask::r-x,other::---" `
+    --path "/" `
+    --file-system $storageContainerName `
+    --account-name $storageAccountName
+
+# Then set access on the next folder
+az storage fs access set `
+    --acl "user::rwx,group::r-x,group:${adGroupForAccessObjectId}:r-x,mask::r-x,other::---" `
+    --path $storageTestFolder `
+    --file-system $storageContainerName `
+    --account-name $storageAccountName
+
+# Now setting default access to all objects created beneath this folder
+az storage fs access set `
+    --acl "user::rwx,group::r-x,group:${adGroupForAccessObjectId}:r-x,mask::r-x,other::---,default:user::rwx,default:group::r-x,default:group:${adGroupForAccessObjectId}:rwx,default:mask::rwx,default:other::---" `
+    --path $storageTestFolder `
+    --file-system $storageContainerName `
+    --account-name $storageAccountName
+
+```
+
+## 1.7. Adding logging and monitoring
+
+```Powershell
+
+# ---------------------------------------------------------------------
+# Add logging and monitoring
+# ---------------------------------------------------------------------
 # To access the preview Application Insights Azure CLI commands, you first need to run:
 az extension add -n application-insights
 
@@ -89,6 +234,12 @@ az monitor app-insights component create `
     --application-type web `
     --kind web `
     --workspace $logWorkspaceId
+
+```
+
+## 1.8. Create Some App Services
+
+```Powershell
 
 az appservice plan create `
     --name $appPlanName `
@@ -115,7 +266,7 @@ az webapp create `
 
 ```
 
-## Creating app identities
+## 1.9. Creating app identities
 
 ```Powershell
 az ad app create `
@@ -126,7 +277,10 @@ az ad app create `
 # TODO: Add API Permission: Microsoft Graph/User.Read when creating app
 # ...
 
+$apiAppObjectId=$(az ad app list --display-name $apiAppMsi --query "[*].[objectId]" --output tsv)
 $apiAppId=$(az ad app list --display-name $apiAppMsi --query "[*].[appId]" --output tsv)
+$apiAppSecret = az ad app credential reset --id $apiAppObjectId --credential-description "Demo secret" --append --query "password" --output tsv
+
 
 az ad app create `
     --display-name $webAppMsi
@@ -171,11 +325,11 @@ az rest --method GET --uri "https://graph.microsoft.com/v1.0/applications/$webAp
 
 ```
 
-## Chose to create apps from scratch or use existing apps from this repo
+## 1.10. Chose to create apps from scratch or use existing apps from this repo
 
 > The apps are already created in this repository, but if you would like to start fresh, choose `Alt 1`.
 
-## Alt 1: Creating the app projects from scratch
+### 1.10.1. Alt 1: Creating the app projects from scratch
 
 If you created the projects from scratch, remember that you also need to write the application code as well (or copy from this repo)...
 
@@ -191,22 +345,11 @@ dotnet new webapi `
     --client-id $apiAppId `
     --tenant-id $tenantId
 
-# dotnet new blazorwasm `
-#     -n "WebApp" `
-#     --framework net6.0 `
-#     --auth SingleOrg `
-#     --client-id $webAppId `
-#     --tenant-id $tenantId
-
 dotnet new blazorwasm `
-    -n "WebApp2" `
+    -n "WebApp" `
     --framework net6.0 `
     --auth SingleOrg `
-    --api-client-id $apiAppId `
-    --app-id-uri "api://$apiAppId" `
     --client-id $webAppId `
-    --default-scope "./default" `
-    --domain "my-domain.com" `
     --tenant-id $tenantId
 
 dotnet new sln
@@ -254,13 +397,11 @@ $apiAppLaunchSettings | ConvertTo-Json -Depth 10 | Out-File "./ApiApp/Properties
 cd ..
 ```
 
-## Alt 2: Use existing projects
+### 1.10.2. Alt 2: Use existing projects from this repo
 
-### Set TenantId and ClientIds when using existing solution from this Git repo
+#### 1.10.2.1. Updating appsettings when using existing solution from this Git repo
 
 ```Powershell
-
-# TODO: Create replace script for json ...
 
 cd ./Source
 
@@ -270,8 +411,10 @@ $tenantId = $(az account show --query "tenantId" --output tsv)
 $webAppSettings = (Get-Content ("./WebApp/wwwroot/appsettings.json") | ConvertFrom-Json)
 
 # Set values
-Invoke-Expression ('$webAppSettings.AzureAd.Authority = "https://login.microsoftonline.com/$tenantId"')
-Invoke-Expression ('$webAppSettings.AzureAd.ClientId = "$webAppId"')
+$webAppSettings.AzureAd.Authority   = "https://login.microsoftonline.com/$tenantId"
+$webAppSettings.AzureAd.ClientId    = "$webAppId"
+$webAppSettings.ApiApp.BaseUrl      = $apiAppLocalUrl
+$webAppSettings.ApiApp.DefaultScope = "api://$apiAppId/.default"
 
 # Write back the appsettings.json file
 $webAppSettings | ConvertTo-Json -Depth 10 | Out-File "./WebApp/wwwroot/appsettings.json" -Force
@@ -280,8 +423,12 @@ $webAppSettings | ConvertTo-Json -Depth 10 | Out-File "./WebApp/wwwroot/appsetti
 $apiAppSettings = (Get-Content ("./ApiApp/appsettings.json") | ConvertFrom-Json)
 
 # Set values
-Invoke-Expression ('$apiAppSettings.AzureAd.TenantId = "$tenantId"')
-Invoke-Expression ('$apiAppSettings.AzureAd.ClientId = "$apiAppId"')
+$apiAppSettings.AzureAd.TenantId = "$tenantId"
+$apiAppSettings.AzureAd.ClientId = "$apiAppId"
+$apiAppSettings.AzureAd.ClientSecret = "$apiAppSecret"
+$apiAppSettings.MyAzureStorage.StorageAccountName = $storageAccountName
+$apiAppSettings.MyAzureStorage.StorageContainerName = $storageContainerName
+$apiAppSettings.MyAzureStorage.FilePath = $storageTestFilePath
 
 # Write back the appsettings.json file
 $apiAppSettings | ConvertTo-Json -Depth 10 | Out-File "./ApiApp/appsettings.json" -Force
@@ -290,7 +437,7 @@ cd ..
 
 ```
 
-## Create a Json file with test data
+## 1.11. Create a Json file with test data
 
 ```Powershell
 
@@ -305,19 +452,21 @@ $testData = @(
     }
 )
 
-$testDataFilePath = "./TestData/testData.json"
-$testData | ConvertTo-Json -Depth 2 | Out-File ( New-Item -Path $testDataFilePath -Force )
+$testData | ConvertTo-Json -Depth 2 | Out-File ( New-Item -Path $localTestDataFilePath -Force )
 
 # Upload this file to the Azure Storage (Gen2) that has been created.
 az storage fs file upload `
-    --source $testDataFilePath `
-    --file-system "laketest1" `
-    --path "folder1/testData.json" `
+    --source $localTestDataFilePath `
+    --file-system $storageContainerName `
+    --path $storageTestFilePath `
     --account-name $storageAccountName
+
+# Show the ACL of the uploaded file
+az storage fs access show -p $storageTestFilePath -f $storageContainerName --account-name $storageAccountName
 
 ```
 
-## Publish Web App with zip-deployment
+## 1.12. Publish Web App with zip-deployment
 
 ```Powershell
 
@@ -344,7 +493,7 @@ az webapp deployment source config-zip `
 
 ```
 
-## Publish Api App with zip-deployment
+## 1.13. Publish Api App with zip-deployment
 
 ```Powershell
 
@@ -370,3 +519,7 @@ az webapp deployment source config-zip `
   --src $apiAppPublishZip
 
 ```
+
+> This is somewhat lengthy example, but it sets up all the bits and pieces for you when creating apps with auth in Azure. Good luck!
+
+.
