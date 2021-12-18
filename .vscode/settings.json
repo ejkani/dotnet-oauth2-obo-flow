@@ -1,0 +1,19 @@
+{
+    "markdownlint.config": {
+        "MD028": false,
+        "MD025": {
+            "front_matter_title": ""
+        }
+    },
+    "cSpell.words": [
+        "appi",
+        "appservice",
+        "appsettings",
+        "blazorwasm",
+        "drawio",
+        "runtimes",
+        "webapi",
+        "westeurope",
+        "wwwroot"
+    ]
+}
