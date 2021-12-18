@@ -17,6 +17,8 @@ References:
 
 ## 1.1. Intro
 
+![Obo Sequence Diagram](./Docs/Images/azure-app-file-demo.png)
+
 ### 1.1.1. Admin Consents
 
 > Note that you need to have administration rights in your Tenant to grant admin consent.
@@ -540,10 +542,11 @@ $demoDataFilePath = "./demoData.json"
 
 $demoData = @(
     @{
-      resourceGroup = $resourceGroup
-      apiAppName    = $apiAppName
-      webAppName    = $webAppName
-      adGroupName   = $apiAppMsi
+      resourceGroup   = $resourceGroup
+      apiAppName      = $apiAppName
+      webAppName      = $webAppName
+      adGroupName     = $apiAppMsi
+      apiClientSecret = ""
     }
 )
 
