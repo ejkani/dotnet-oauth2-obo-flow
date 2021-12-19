@@ -15,25 +15,20 @@ namespace ApiApp.Services
         /// <param name="clientID"></param>
         /// <param name="clientSecret"></param>
         /// <param name="tenantID"></param>
-        //public static void GetDataLakeServiceClient(
-        //    ref DataLakeServiceClient dataLakeServiceClient,
-        //    String accountName, String clientID,
-        //    string clientSecret, string tenantID)
-        //{
         public static void GetDataLakeServiceClient(
             ref DataLakeServiceClient dataLakeServiceClient,
-            String accountName, String clientID,
-            string clientSecret, string tenantID, string accessToken)
+            string accountName,
+            string clientID,
+            string clientSecret,
+            string tenantID,
+            string accessToken)
         {
 
-            //TokenCredential credential = new ClientSecretCredential(tenantID, clientID, clientSecret, new TokenCredentialOptions());
             TokenCredential credential = new OnBehalfOfCredential(
                 tenantID,
                 clientID,
                 clientSecret,
                 accessToken);
-
-            //var managedCredential = new ManagedIdentityCredential("clientId");
 
             string dfsUri = "https://" + accountName + ".dfs.core.windows.net";
 
