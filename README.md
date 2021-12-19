@@ -8,6 +8,7 @@ When an api doesn't own its resources or the access to those, it is sometime han
 
 References:
 
+* <https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-on-behalf-of-flow>
 * <https://docs.microsoft.com/en-us/azure/active-directory/develop/scenario-web-api-call-api-acquire-token?tabs=aspnetcore>
 * <https://github.com/Azure/azure-sdk-for-net/issues/16264>
 
