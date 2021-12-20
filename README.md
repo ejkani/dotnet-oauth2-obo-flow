@@ -754,7 +754,7 @@ function saveDemoData()
         apiAppId         = $apiAppId
         webAppName      = $webAppName
         webAppId        = $webAppId
-        adGroupName     = $apiAppMsi
+        adGroupName     = $adGroupForAccess
       }
   )
 
