@@ -48,95 +48,157 @@ This will be done later, but this is showing where the Admin Consent is set for 
 
 > Upgrade `az cli` with `az upgrade`, since some validation lies within the tool itself.
 
+### 1.2.1. Get your subscriptions
+
 ```Powershell
 
+# ------------------------------------------------------------------
 # Run login first, so you can see your subscriptions
+# ------------------------------------------------------------------
 az login
 
+# ------------------------------------------------------------------
 # List your Azure subscription in a more readable manner
+# ------------------------------------------------------------------
 az account list --query "[].{name:name, subscriptionId:id}"
 
-# ##################################################################
-# Set your variables
-# ##################################################################
+```
+
+### 1.2.2. Set your subscription to use
+
+```Powershell
+
+# ------------------------------------------------------------------
 # Set you Azure Subscription name and preferred resource location
 # ------------------------------------------------------------------
 $subscriptionName      = "<YOUR_AZURE_SUBSCRIPTION_NAME>"
+
+# ------------------------------------------------------------------
+# Then set the subscription name explicitly.
+# ------------------------------------------------------------------
+az account set -s "$subscriptionName"
+
+# ------------------------------------------------------------------
+# Verify that you set the correct subscription
+# ------------------------------------------------------------------
+az account show
+
 ```
 
 ## 1.3. Start setting variables we're going to use
 
+### 1.3.1. Create simple functions for setting variables
+
 ```Powershell
-$location              = "westeurope"
-$myDemoNamePrefix      = "oauth2-obo-flow-demo"
-$myDemoNamePrefixShort = $myDemoNamePrefix -replace "-"
 
-# Setting variables
-$rand               = Get-Random -Minimum 10 -Maximum 99
-$resourceGroup      = "$myDemoNamePrefix-rg-$rand"
-$storageAccountName = "${myDemoNamePrefixShort}st$rand"
-$logWorkspaceName   = "${myDemoNamePrefix}-log-$rand"
-$appInsightsName    = "${myDemoNamePrefix}-appi-$rand"
-$appPlanName        = "${myDemoNamePrefix}-app-plan-$rand"
-$adGroupForAccess   = "$myDemoNamePrefix-adgroup-$rand"
+function setCommonVariables($demoName, $resourceLocation)
+{
+  $location              = $resourceLocation
+  $myDemoNamePrefix      = $demoName
+  $myDemoNamePrefixShort = $myDemoNamePrefix -replace "-"
+  $rand                  = Get-Random -Minimum 10 -Maximum 99
+  $resourceGroup         = "$myDemoNamePrefix-rg-$rand"
+  $storageAccountName    = "${myDemoNamePrefixShort}st$rand"
+  $logWorkspaceName      = "${myDemoNamePrefix}-log-$rand"
+  $appInsightsName       = "${myDemoNamePrefix}-appi-$rand"
+  $appPlanName           = "${myDemoNamePrefix}-app-plan-$rand"
+  $adGroupForAccess      = "$myDemoNamePrefix-adgroup-$rand"
+}
 
-$apiAppName      = "${myDemoNamePrefix}-api-app-$rand"
-$apiAppMsi       = "${myDemoNamePrefix}-api-msi-$rand"
-$apiAppLocalUrl  = "https://localhost:7050"
-$apiAppPublicUrl = "https://$apiAppName.azurewebsites.net"
+function setApiAppVariables($localhostApiAppPort)
+{
+  $apiAppName      = "${myDemoNamePrefix}-api-app-$rand"
+  $apiAppMsi       = "${myDemoNamePrefix}-api-msi-$rand"
+  $apiAppLocalUrl  = "https://localhost:$localhostApiAppPort"
+  $apiAppPublicUrl = "https://$apiAppName.azurewebsites.net"
+}
 
+function setWebAppVariables($localhostWebAppPort)
+{
+  $webAppName      = "${myDemoNamePrefix}-web-app-$rand"
+  $webAppMsi       = "${myDemoNamePrefix}-web-msi-$rand"
+  $webAppLocalUrl  = "https://localhost:localhostWebAppPort"
+  $webAppPublicUrl = "https://$webAppName.azurewebsites.net"
+}
 
-$webAppName      = "${myDemoNamePrefix}-web-app-$rand"
-$webAppMsi       = "${myDemoNamePrefix}-web-msi-$rand"
-$webAppLocalUrl  = "https://localhost:7051"
-$webAppPublicUrl = "https://$webAppName.azurewebsites.net"
+function setStorageVariables($containerName, $rootFolder)
+{
+  # NOTE: The Container(File System) name needs to be lowercase.
+  $storageContainerName  = $containerName
+  $storageTestFolder     = $rootFolder
+  $storageTestFilePath   = "$storageTestFolder/TestFile.json"
+  $localTestDataFilePath = "./TestData/testData.json"
+}
 
-# NOTE: The Container(File System) name needs to be lowercase.
-$storageContainerName  = "myfilesystem"
-$storageTestFolder     = "Folder2"
-$storageTestFilePath   = "$storageTestFolder/TestFile.json"
-$localTestDataFilePath = "./TestData/testData.json"
-
-# Then set the subscription name explicitly.
-az account set -s "$subscriptionName"
-
-# Verify that you set the correct subscription
-az account show
+function setSqlVariables()
+{
+  $sqlServerName = "${myDemoNamePrefix}-sql-$rand"
+}
 
 ```
+
+### 1.3.2. Execute above functions to set variables
+
+```Powershell
+
+# ------------------------------------------------------------------
+# Setup and run these functions
+# ------------------------------------------------------------------
+setCommonVariables("oauth2-obo-flow-demo", "westeurope")
+setApiAppVariables("7050")
+setWebAppVariables("7051")
+setStorageVariables("myfscontainer", "Folder1")
+setSqlVariables()
+
+```
+
 
 ## 1.4. Start creating resources
 
 ```Powershell
 
-az group create -n $resourceGroup -l $location
+function createResourceGroup()
+{
+  az group create -n $resourceGroup -l $location
+}
 
-# ---------------------------------------------------------------------
-# Creating file system and folder structure
-# ---------------------------------------------------------------------
-# Create storage account. Be patient, this could take some seconds.
-az storage account create `
-  --name $storageAccountName `
-  --location $location `
-  --resource-group $resourceGroup `
-  --sku Standard_LRS `
-  --kind StorageV2 `
-  --enable-hierarchical-namespace true
+function createAzureStorage()
+{
+  # ---------------------------------------------------------------------
+  # Creating file system and folder structure.
+  # Create storage account. Be patient, this could take some seconds.
+  # ---------------------------------------------------------------------
+  az storage account create `
+    --name $storageAccountName `
+    --location $location `
+    --resource-group $resourceGroup `
+    --sku Standard_LRS `
+    --kind StorageV2 `
+    --enable-hierarchical-namespace true
 
-# Create the file system (Container)
-az storage container create `
-    --name $storageContainerName `
-    --account-name $storageAccountName `
-    --public-access off `
-    --resource-group $resourceGroup
+  # ---------------------------------------------------------------------
+  # Create the file system (Container)
+  # ---------------------------------------------------------------------
+  az storage container create `
+      --name $storageContainerName `
+      --account-name $storageAccountName `
+      --public-access off `
+      --resource-group $resourceGroup
 
-# Need to install an extension to be able to create folders for now
-az extension add -n storage-preview
+  # ---------------------------------------------------------------------
+  # Need to install an extension to be able to create folders for now
+  # ---------------------------------------------------------------------
+  az extension add -n storage-preview
 
-az storage blob directory create `
-    --container-name $storageContainerName `
-    --directory-path $storageTestFolder `
-    --account-name $storageAccountName
+  az storage blob directory create `
+      --container-name $storageContainerName `
+      --directory-path $storageTestFolder `
+      --account-name $storageAccountName
+
+}
+
+createResourceGroup()
+createAzureStorage()
 
 ```
 
@@ -144,19 +206,24 @@ az storage blob directory create `
 
 ```Powershell
 
-# ---------------------------------------------------------------------
-# Create Azure AD Group with members
-# ---------------------------------------------------------------------
-# Create an AD Group to manage ACL Access. TODO: Move to own chapter
-az ad group create --display-name $adGroupForAccess --mail-nickname $adGroupForAccess
-$adGroupForAccessObjectId = $(az ad group list --display-name $adGroupForAccess --query "[*].[objectId]" --output tsv)
+function createAzureAdGroup()
+{
+  # ---------------------------------------------------------------------
+  # Create Azure AD Group with members
+  # ---------------------------------------------------------------------
+  # Create an AD Group to manage ACL Access. TODO: Move to own chapter
+  az ad group create --display-name $adGroupForAccess --mail-nickname $adGroupForAccess
+  $adGroupForAccessObjectId = $(az ad group list --display-name $adGroupForAccess --query "[*].[objectId]" --output tsv)
 
-# Adding you to the created group
-$currentUserObjectId = $(az ad signed-in-user show --query "objectId" --output tsv)
+  # Adding you to the created group
+  $currentUserObjectId = $(az ad signed-in-user show --query "objectId" --output tsv)
 
-az ad group member add `
-    --group $adGroupForAccessObjectId `
-    --member-id $currentUserObjectId
+  az ad group member add `
+      --group $adGroupForAccessObjectId `
+      --member-id $currentUserObjectId
+}
+
+createAzureAdGroup()
 
 ```
 
@@ -164,19 +231,32 @@ az ad group member add `
 
 ```Powershell
 
-# List members before removal
-az ad group member list `
-    --group  $adGroupForAccessObjectId `
-    --query "[].{objectId:objectId, userPrincipalName:userPrincipalName}" --out table
+function removeCurrentUserFromAdGroup()
+{
+  az ad group member remove `
+      --group $adGroupForAccessObjectId `
+      --member-id $currentUserObjectId
+}
 
-az ad group member remove `
-    --group $adGroupForAccessObjectId `
-    --member-id $currentUserObjectId
+function listMembersOfAdGroup()
+{
+  # ---------------------------------------------------------------------
+  # List members
+  # ---------------------------------------------------------------------
+  echo "Listing members of Ad Group [$adGroupForAccess]:"
+  az ad group member list `
+      --group  $adGroupForAccessObjectId `
+      --query "[].{objectId:objectId, userPrincipalName:userPrincipalName}" --out table
+}
 
-# List members after removal. Not formatting as table, so you would only see an empty array bracket.
-az ad group member list `
-    --group  $adGroupForAccessObjectId `
-    --query "[].{objectId:objectId, userPrincipalName:userPrincipalName}"
+# List before removal
+listMembersOfAdGroup()
+
+# Remove
+removeCurrentUserFromAdGroup()
+
+# List after removal
+listMembersOfAdGroup()
 
 ```
 
@@ -184,30 +264,43 @@ az ad group member list `
 
 ```Powershell
 
-# ---------------------------------------------------------------------
-# Set access to storage folders and files (ACL access and default access)
-# ---------------------------------------------------------------------
+function setAzureStorageAccess()
+{
+  # ---------------------------------------------------------------------
+  # Set access to storage folders and files.
+  # (ACL access and default access)
+  # ---------------------------------------------------------------------
 
-# We are not using RBAC (Role Based Access) but more fine grained access with ACL (Access Control Lists)
-az storage fs access set `
-    --acl "user::rwx,group::r-x,group:${adGroupForAccessObjectId}:r-x,mask::r-x,other::---" `
-    --path "/" `
-    --file-system $storageContainerName `
-    --account-name $storageAccountName
+  # ---------------------------------------------------------------------
+  # We are not using RBAC (Role Based Access) but more fine grained
+  # access with ACL (Access Control Lists)
+  # ---------------------------------------------------------------------
+  az storage fs access set `
+      --acl "user::rwx,group::r-x,group:${adGroupForAccessObjectId}:r-x,mask::r-x,other::---" `
+      --path "/" `
+      --file-system $storageContainerName `
+      --account-name $storageAccountName
 
-# Then set access on the next folder
-az storage fs access set `
-    --acl "user::rwx,group::r-x,group:${adGroupForAccessObjectId}:r-x,mask::r-x,other::---" `
-    --path $storageTestFolder `
-    --file-system $storageContainerName `
-    --account-name $storageAccountName
+  # ---------------------------------------------------------------------
+  # Then set access on the next folder
+  # ---------------------------------------------------------------------
+  az storage fs access set `
+      --acl "user::rwx,group::r-x,group:${adGroupForAccessObjectId}:r-x,mask::r-x,other::---" `
+      --path $storageTestFolder `
+      --file-system $storageContainerName `
+      --account-name $storageAccountName
 
-# Now setting default access to all objects created beneath this folder
-az storage fs access set `
-    --acl "user::rwx,group::r-x,group:${adGroupForAccessObjectId}:r-x,mask::r-x,other::---,default:user::rwx,default:group::r-x,default:group:${adGroupForAccessObjectId}:rwx,default:mask::rwx,default:other::---" `
-    --path $storageTestFolder `
-    --file-system $storageContainerName `
-    --account-name $storageAccountName
+  # ---------------------------------------------------------------------
+  # Now setting default access to all objects created beneath this folder
+  # ---------------------------------------------------------------------
+  az storage fs access set `
+      --acl "user::rwx,group::r-x,group:${adGroupForAccessObjectId}:r-x,mask::r-x,other::---,default:user::rwx,default:group::r-x,default:group:${adGroupForAccessObjectId}:rwx,default:mask::rwx,default:other::---" `
+      --path $storageTestFolder `
+      --file-system $storageContainerName `
+      --account-name $storageAccountName
+}
+
+setAzureStorageAccess()
 
 ```
 
@@ -215,57 +308,81 @@ az storage fs access set `
 
 ```Powershell
 
-# ---------------------------------------------------------------------
-# Add logging and monitoring
-# ---------------------------------------------------------------------
-# To access the preview Application Insights Azure CLI commands, you first need to run:
-az extension add -n application-insights
+function createLogAndMonitoring()
+{
+  # ---------------------------------------------------------------------
+  # Add logging and monitoring
+  # ---------------------------------------------------------------------
+  # To access the preview Application Insights Azure CLI commands, you first need to run:
+  az extension add -n application-insights
 
-# Create log workspace. Be patient, this could take some seconds.
-az monitor log-analytics workspace create `
-    --resource-group $resourceGroup `
-    --workspace-name $logWorkspaceName `
-    --location $location
+  # Create log workspace. Be patient, this could take some seconds.
+  az monitor log-analytics workspace create `
+      --resource-group $resourceGroup `
+      --workspace-name $logWorkspaceName `
+      --location $location
 
-$logWorkspaceId=$(az monitor log-analytics workspace list --query "[?contains(name, '$logWorkspaceName')].[id]" --output tsv)
+  $logWorkspaceId=$(az monitor log-analytics workspace list --query "[?contains(name, '$logWorkspaceName')].[id]" --output tsv)
 
-# Now you can run the following to create your Application Insights resource:
-az monitor app-insights component create `
-    --app $appInsightsName `
-    --location $location `
-    --resource-group $resourceGroup `
-    --application-type web `
-    --kind web `
-    --workspace $logWorkspaceId
+  # Now you can run the following to create your Application Insights resource:
+  az monitor app-insights component create `
+      --app $appInsightsName `
+      --location $location `
+      --resource-group $resourceGroup `
+      --application-type web `
+      --kind web `
+      --workspace $logWorkspaceId
+}
+
+createLogAndMonitoring()
 
 ```
 
 ## 1.8. Create Some App Services
 
+Create an App Service Plan first
+
 ```Powershell
 
-az appservice plan create `
-    --name $appPlanName `
-    --resource-group $resourceGroup `
-    --is-linux `
-    --location $location `
-    --sku S1
+function createAppService()
+{
+  az appservice plan create `
+      --name $appPlanName `
+      --resource-group $resourceGroup `
+      --is-linux `
+      --location $location `
+      --sku S1
+}
 
+createAppService()
 
-# Create the Azure App instances
-# NOTE: To list runtimes, use: "az webapp list-runtimes"
-# NOTE: Deploying could fail cause of runtime validations in the cli. If so, upgrade your Azure Cli with "az upgrade"
-az webapp create `
-  --name $apiAppName `
-  --plan $appPlanName `
-  --runtime "DOTNET:6.0" `
-  --resource-group $resourceGroup
+```
 
-az webapp create `
-  --name $webAppName `
-  --plan $appPlanName `
-  --runtime "DOTNET:6.0" `
-  --resource-group $resourceGroup
+Then create the Azure App instances
+
+```Powershell
+
+function createAppServices()
+{
+  # ---------------------------------------------------------------------
+  # NOTE: To list runtimes, use: "az webapp list-runtimes"
+  # NOTE: Deploying could fail cause of runtime validations in the cli.
+  #       If so, upgrade your Azure Cli with "az upgrade"
+  # ---------------------------------------------------------------------
+  az webapp create `
+    --name $apiAppName `
+    --plan $appPlanName `
+    --runtime "DOTNET:6.0" `
+    --resource-group $resourceGroup
+
+  az webapp create `
+    --name $webAppName `
+    --plan $appPlanName `
+    --runtime "DOTNET:6.0" `
+    --resource-group $resourceGroup
+}
+
+createAppServices()
 
 ```
 
