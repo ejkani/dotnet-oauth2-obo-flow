@@ -537,7 +537,7 @@ function updateExistingSourceCode()
 
   # Set values
   $webAppSettings.AzureAd.Authority   = "https://login.microsoftonline.com/$tenantId"
-  $webAppSettings.AzureAd.ClientId    = "$webAppId"
+  $webAppSettings.AzureAd.ClientId    = $webAppId
   $webAppSettings.ApiApp.BaseUrl      = $apiAppLocalUrl
   $webAppSettings.ApiApp.DefaultScope = "api://$apiAppId/.default"
 
@@ -548,12 +548,12 @@ function updateExistingSourceCode()
   $apiAppSettings = (Get-Content ("./Source/ApiApp/appsettings.json") | ConvertFrom-Json)
 
   # Set values
-  $apiAppSettings.AzureAd.TenantId = "$tenantId"
-  $apiAppSettings.AzureAd.ClientId = "$apiAppId"
-  $apiAppSettings.AzureAd.ClientSecret = "$apiAppSecret"
-  $apiAppSettings.MyAzureStorage.StorageAccountName = $storageAccountName
+  $apiAppSettings.AzureAd.TenantId                    = $tenantId
+  $apiAppSettings.AzureAd.ClientId                    = $apiAppId
+  $apiAppSettings.AzureAd.ClientSecret                = $apiAppSecret
+  $apiAppSettings.MyAzureStorage.StorageAccountName   = $storageAccountName
   $apiAppSettings.MyAzureStorage.StorageContainerName = $storageContainerName
-  $apiAppSettings.MyAzureStorage.FilePath = $storageTestFilePath
+  $apiAppSettings.MyAzureStorage.FilePath             = $storageTestFilePath
 
   # Write back the appsettings.json file
   $apiAppSettings | ConvertTo-Json -Depth 10 | Out-File "./Source/ApiApp/appsettings.json" -Force
