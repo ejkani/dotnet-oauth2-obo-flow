@@ -350,3 +350,6 @@ MigrationBackup/
 .ionide/
 
 *-publish.zip
+README.md
+demoData.json
+TestData/testData.json
