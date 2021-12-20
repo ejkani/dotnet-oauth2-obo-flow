@@ -769,7 +769,7 @@ saveDemoData
 
 ```Powershell
 
-function deleteDemoData()
+function deleteDemoResources()
 {
   $demoDataFilePath = "./demoData.json"
 
@@ -782,7 +782,7 @@ function deleteDemoData()
   az ad group delete --group $currentDemoData.adGroupName
 }
 
-deleteDemoData
+deleteDemoResources
 
 ```
 
