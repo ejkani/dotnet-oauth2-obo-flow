@@ -353,3 +353,5 @@ MigrationBackup/
 README.md
 demoData.json
 TestData/testData.json
+sqlGrants.sql
+synapseSqlGrants.sql

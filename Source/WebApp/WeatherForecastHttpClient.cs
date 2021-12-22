@@ -81,5 +81,28 @@ namespace WebApp
 
             return "";
         }
+
+        public async Task<string> GetSqlData()
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "sqldata");
+            request.SetBrowserResponseStreamingEnabled(true); // Enable response streaming
+
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+            response.EnsureSuccessStatusCode();
+
+            if (response.Content is object)
+            {
+                var resp = await response.Content.ReadAsStringAsync();
+                return resp;
+
+                // TODO: We can also deserialize the stream to an object list if we want.
+                //var stream = await response.Content.ReadAsStreamAsync();
+                //var data = await JsonSerializer.DeserializeAsync<List<Book>>(stream);
+                // do something with the data or return it
+            }
+
+            return "";
+        }
     }
 }
