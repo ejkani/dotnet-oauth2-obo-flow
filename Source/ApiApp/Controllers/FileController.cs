@@ -12,9 +12,9 @@ namespace ApiApp.Controllers;
 public class FileController : ControllerBase
 {
     private readonly IConfiguration _configuration;
-    private readonly ILogger<WeatherForecastController> _logger;
+    private readonly ILogger<FileController> _logger;
 
-    public FileController(IConfiguration configuration, ILogger<WeatherForecastController> logger)
+    public FileController(IConfiguration configuration, ILogger<FileController> logger)
     {
         _configuration = configuration;
         _logger = logger;

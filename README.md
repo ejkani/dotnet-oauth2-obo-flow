@@ -134,11 +134,6 @@ function setStorageVariables($containerName, $rootFolder)
   $global:localTestDataFilePath = "./TestData/testData.json"
 }
 
-function setSqlVariables()
-{
-  $global:sqlServerName = "${myDemoNamePrefix}-sql-$rand"
-}
-
 ```
 
 ### 1.3.2. Execute above functions to set variables
@@ -152,10 +147,8 @@ setCommonVariables "oauth2-obo-flow-demo" "westeurope"
 setApiAppVariables "7050"
 setWebAppVariables "7051"
 setStorageVariables "myfscontainer" "Folder1"
-setSqlVariables
 
 ```
-
 
 ## 1.4. Start creating resources
 
@@ -403,29 +396,29 @@ createAppServices
 
 function createApiAppRegistration()
 {
-  $apiAppIdentifierUrl = "api://$apiAppId"
   az ad app create `
-      --display-name $apiAppMsi `
-      --identifier-uris $apiAppIdentifierUrl # NOTE: You can use fqdn's if you use your verified domain name.
+      --display-name $apiAppMsi
+      # --identifier-uris $apiAppIdentifierUrl # NOTE: You can use fqdn's if you use your verified domain name.
       # --reply-urls $apiAppLocalUrl $apiAppPublicUrl # TODO: Seems like it's not needed. Maybe when enabling login with Swagger UI ...
       
 
-  $global:apiAppObjectId=$(az ad app list --display-name $apiAppMsi --query "[*].[objectId]" --output tsv)
-  $global:apiAppId=$(az ad app list --display-name $apiAppMsi --query "[*].[appId]" 
-  --output tsv)
+  $global:apiAppObjectId = $(az ad app list --display-name $apiAppMsi --query "[*].[objectId]" --output tsv)
+  $global:apiAppId = $(az ad app list --display-name $apiAppMsi --query "[*].[appId]" --output tsv)
+  $apiAppIdentifierUrl = "api://$apiAppId"
+
+  # Update the ApplicationUrl Id, since we don't use a domain name, but need to use the AppId.
+  az ad app update `
+    --id $apiAppId `
+    --identifier-uris $apiAppIdentifierUrl
 
   # Create the Service Principal (Managed App) on top of
   # of the App Registration, to be able to Grant Api permissions later.
   az ad sp create `
     --id $apiAppId
 
-  # Update the ApplicationUrl Id if needed
-  # az ad app update `
-  #   --id $apiAppId `
-  #   --identifier-uris $apiAppIdentifierUrl
 
   # Define Azure Storage API variables
-  $azureStorageResourceAppId   = "e406a681-f3d4-42a8-90b6-c2b029497af1"
+  $azureStorageResourceAppId  = "e406a681-f3d4-42a8-90b6-c2b029497af1"
   $azureStoragePermissionId   = "03e0da56-190b-40ad-a80c-ea378c433f7f"
   $azureStoragePermissionType = "Scope"
 
@@ -441,7 +434,7 @@ function createApiAppRegistration()
   # NOTE:
   # Should not expose secrets like this in a real environment,
   # but doing it simple in this demo
-  $global:apiAppSecret = az ad app credential reset --id $apiAppObjectId --credential-description "Demo secret" --append --query "password" --output tsv
+  $global:apiAppSecret = $(az ad app credential reset --id $apiAppObjectId --credential-description "Demo secret" --append --query "password" --output tsv)
 }
 
 createApiAppRegistration
@@ -459,8 +452,8 @@ function createWebAppRegistration()
       # --reply-urls <NOT APPLICABLE HERE> # NOTE: Setting reply urls further down, since we need to set the type to "Spa" as well.
       # --identifier-uris $apiAppLocalUrl $apiAppPublicUrl # NOTE: You can use this if you use your domain verified domain name
 
-  $global:webAppObjectId=$(az ad app list --display-name $webAppMsi --query "[*].[objectId]" --output tsv)
-  $global:webAppId=$(az ad app list --display-name $webAppMsi --query "[*].[appId]" --output tsv)
+  $global:webAppObjectId = $(az ad app list --display-name $webAppMsi --query "[*].[objectId]" --output tsv)
+  $global:webAppId = $(az ad app list --display-name $webAppMsi --query "[*].[appId]" --output tsv)
 
   # Create the Service Principal (Managed App) on top of
   # of the App Registration, to be able to Grant Api permissions later.
@@ -520,7 +513,6 @@ createWebAppRegistration
 ## 1.10. Chose to create apps from scratch or use existing apps from this repo
 
 > The apps are already created in this repository, but if you would like to start fresh, choose `Alt 1`.
-
 
 ### 1.10.1. **Alt 1:** Use existing projects from this repo
 
@@ -749,12 +741,12 @@ function saveDemoData()
 
   $demoData = @(
       @{
-        resourceGroup   = $resourceGroup
-        apiAppName      = $apiAppName
-        apiAppId         = $apiAppId
-        webAppName      = $webAppName
-        webAppId        = $webAppId
-        adGroupName     = $adGroupForAccess
+        resourceGroup = $resourceGroup
+        apiAppName    = $apiAppName
+        apiAppId      = $apiAppId
+        webAppName    = $webAppName
+        webAppId      = $webAppId
+        adGroupName   = $adGroupForAccess
       }
   )
 
@@ -787,5 +779,9 @@ deleteDemoResources
 ```
 
 > This is somewhat lengthy example, but it sets up all the bits and pieces for you when creating apps with auth in Azure. Good luck!
+
+## Continue with Synapse Sql
+
+Continue with [**creating a Synapse Sql OBO FLow**](./synapse-obo-flow.md)
 
 .
