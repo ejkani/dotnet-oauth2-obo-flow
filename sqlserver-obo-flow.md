@@ -1,4 +1,4 @@
-# Sql Server OAuth2 OnBehalfOf Flow
+# Work in progress: Sql Server OAuth2 OnBehalfOf Flow
 
 ## Starting by extending our variables
 

@@ -54,7 +54,6 @@ function createPassword {
 
 ```
 
-
 ## Starting by extending our variables
 
 ```Powershell
@@ -90,18 +89,24 @@ function createAzureAdGroupForSynapseAdmin()
   $global:adGroupForSynapseAdminObjectId = $(az ad group list --display-name $adGroupForSynapseAdmin --query "[*].[objectId]" --output tsv)
 }
 
-function addCurrentUserToAdGroupForSynapseAdmin()
+function addIdentitiesToAdGroupForSynapseAdmin()
 {
   # Adding you to the created group
   $global:currentUserObjectId = $(az ad signed-in-user show --query "objectId" --output tsv)
 
+  # Add you in the Ad Group
   az ad group member add `
       --group $adGroupForSynapseAdminObjectId `
       --member-id $currentUserObjectId
+
+  # Add the Api app to the Ad Group to be able to query the sql database, since it has Ad Auth.
+  az ad group member add `
+      --group $adGroupForSynapseAdminObjectId `
+      --member-id $apiAppSpObjectId
 }
 
 createAzureAdGroupForSynapseAdmin
-addCurrentUserToAdGroupForSynapseAdmin
+addIdentitiesToAdGroupForSynapseAdmin
 
 ```
 
@@ -173,15 +178,21 @@ function createSynapse()
     #   --workspace-name $synapseName
 
     # Add Azure Sql to the Api Permissions
-    $azureSqlResourceAppId = "022907d3-0f1b-48f7-badc-1ba6abab6d66"
-    $azureSqlPermissionId   = "03e0da56-190b-40ad-a80c-ea378c433f7f"
-    $azureSqlPermissionType = "Scope"
+    $azureSqlResourceAppId       = "022907d3-0f1b-48f7-badc-1ba6abab6d66"
+    $azureSqlUserImpersonationId = "c39ef2d1-04ce-46dc-8b5f-e9a5c60f0fc9"
+    $azureSqlAppImpersonationId  = "efe4d732-bfbb-4617-8a77-349a9d67c720"
 
-    # Add API Permission: Azure Storage / user_impersonation
-  az ad app permission add `
-    --id $apiAppId `
-    --api $azureSqlResourceAppId `
-    --api-permissions "$azureSqlPermissionId=$azureSqlPermissionType"
+    # Add API Permission: Azure SQL Database / user_impersonation
+    az ad app permission add `
+      --id $apiAppId `
+      --api $azureSqlResourceAppId `
+      --api-permissions "$azureSqlUserImpersonationId=Scope"
+
+    # Add API Permission: Azure SQL Database / app_impersonation
+    az ad app permission add `
+      --id $apiAppId `
+      --api $azureSqlResourceAppId `
+      --api-permissions "$azureSqlAppImpersonationId=Role"
 
   # Doing the ADMIN CONSENT (You need to have admin rights to do this)
   az ad app permission admin-consent --id $apiAppId
@@ -216,6 +227,8 @@ updateSourceCodeWithSynapseProperties
 
 ## Create Sql Script to grant our AD Group access
 
+Run the script created below in your Sql Tool, e.g. Azure Data Studio. You'll find the Sql Server connection in the top of this script.
+
 ```Powershell
 
 function createSynapseSqlGrantScript()
@@ -223,13 +236,13 @@ function createSynapseSqlGrantScript()
     $testFileFullDfsPath = "https://${storageAccountName}.dfs.core.windows.net/${storageContainerName}/${storageTestFilePath}"
     $global:sqlGrantScript = "
     -- Log in to this sql server db
-    -- sql server:   $synapseSqlName
-    -- sql database: $synapseSqlOnDemandName
+    -- sql server:   $synapseSqlOnDemandName
     -- Log in with your Azure AD user and run the below script
 
     IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = '${synapseDbName}') CREATE DATABASE [${synapseDbName}]
 
     -- Set collation
+    USE [${synapseDbName}]
     IF NOT EXISTS(SELECT c.Collation FROM (SELECT DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS Collation) c  
     WHERE c.Collation = 'Latin1_General_100_BIN2_UTF8')
     BEGIN
@@ -242,6 +255,10 @@ function createSynapseSqlGrantScript()
     ALTER ROLE db_datareader ADD MEMBER [${adGroupForSynapseAdmin}];
     GO
 
+    -- Grant Ad Group permission to use the bulk load statement
+    GRANT ADMINISTER DATABASE BULK OPERATIONS TO [${adGroupForSynapseAdmin}];
+    GO
+
     -- https://docs.microsoft.com/en-us/azure/synapse-analytics/sql/query-json-files
 
     CREATE SCHEMA demo
@@ -249,7 +266,7 @@ function createSynapseSqlGrantScript()
         AS
           select top 10 *
     from openrowset(
-            bulk '${$testFileFullDfsPath}',
+            bulk '${testFileFullDfsPath}',
             format = 'csv',
             fieldterminator ='0x0b',
             fieldquote = '0x0b'
@@ -261,7 +278,7 @@ function createSynapseSqlGrantScript()
     -- select * from demo.testdata_json
 
     -- TODO:
-    -- SELECT * FROM OPENROWSET(BULK '${$testFileFullDfsPath}', 
+    -- SELECT * FROM OPENROWSET(BULK '${testFileFullDfsPath}', 
     -- FORMAT = 'CSV') AS DATA
 
     "

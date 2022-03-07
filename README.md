@@ -16,6 +16,11 @@ References:
 
 * All steps below are executed from the root folder (the same folder as this README file)
 
+## Todo's
+
+* [X] Set ApiApp's `"accessTokenAcceptedVersion": 2,` in manifest programatically.
+* [X] Add `oauth2-obo-flow-demo-api-msi-nn` to Ad Group.
+
 ## 1.1. Intro
 
 ![Obo Sequence Diagram](./Docs/Images/azure-app-file-demo.png)
@@ -57,6 +62,12 @@ This will be done later, but this is showing where the Admin Consent is set for 
 # ------------------------------------------------------------------
 az login
 
+```
+
+> TIP: If you get a message saying: **`Found multiple accounts with the same username...`** then run **`az account clear`** and then **manually log in** to `portal.azure.com` and choose `use another login`. It could be that you e.g. got both a personal and/or a work/school account.
+
+```Powershell
+
 # ------------------------------------------------------------------
 # List your Azure subscription in a more readable manner
 # ------------------------------------------------------------------
@@ -82,6 +93,9 @@ $subscriptionName = "<YOUR_AZURE_SUBSCRIPTION_NAME>"
 # ------------------------------------------------------------------
 az account set -s "$subscriptionName"
 
+```
+
+```Powershell
 # ------------------------------------------------------------------
 # Verify that you set the correct subscription
 # ------------------------------------------------------------------
@@ -402,8 +416,10 @@ function createApiAppRegistration()
       # --reply-urls $apiAppLocalUrl $apiAppPublicUrl # TODO: Seems like it's not needed. Maybe when enabling login with Swagger UI ...
       
 
-  $global:apiAppObjectId = $(az ad app list --display-name $apiAppMsi --query "[*].[objectId]" --output tsv)
-  $global:apiAppId = $(az ad app list --display-name $apiAppMsi --query "[*].[appId]" --output tsv)
+  $global:apiAppObjectId            = $(az ad app list --display-name $apiAppMsi --query "[*].[objectId]" --output tsv)
+  $global:apiAppId                  = $(az ad app list --display-name $apiAppMsi --query "[*].[appId]" --output tsv)
+  $global:apiAppUserImpersonationId = $(az ad sp show --id $apiAppId --query "oauth2Permissions[?value=='user_impersonation'].id | [0]")
+
   $apiAppIdentifierUrl = "api://$apiAppId"
 
   # Update the ApplicationUrl Id, since we don't use a domain name, but need to use the AppId.
@@ -416,17 +432,32 @@ function createApiAppRegistration()
   az ad sp create `
     --id $apiAppId
 
+  $global:apiAppSpObjectId = $(az ad sp list --display-name $apiAppMsi --query "[*].[objectId]" --output tsv)
+}
 
+createApiAppRegistration
+
+```
+
+Set Api App Permissions
+
+```Powershell
+
+function setApiAppPermissions()
+{
   # Define Azure Storage API variables
   $azureStorageResourceAppId  = "e406a681-f3d4-42a8-90b6-c2b029497af1"
   $azureStoragePermissionId   = "03e0da56-190b-40ad-a80c-ea378c433f7f"
-  $azureStoragePermissionType = "Scope"
 
   # Add API Permission: Azure Storage / user_impersonation
   az ad app permission add `
     --id $apiAppId `
     --api $azureStorageResourceAppId `
-    --api-permissions "$azureStoragePermissionId=$azureStoragePermissionType"
+    --api-permissions "$azureStoragePermissionId=Scope"
+
+  # TODO: Add API Permission: Azure Storage / app_impersonation
+  # ...
+  
 
   # Doing the ADMIN CONSENT (You need to have admin rights to do this)
   az ad app permission admin-consent --id $apiAppId
@@ -437,7 +468,7 @@ function createApiAppRegistration()
   $global:apiAppSecret = $(az ad app credential reset --id $apiAppObjectId --credential-description "Demo secret" --append --query "password" --output tsv)
 }
 
-createApiAppRegistration
+setApiAppPermissions
 
 ```
 
@@ -468,14 +499,20 @@ function createWebAppRegistration()
 
    # Define access to the ApiApp
   $userImpersonationPermissionId   = "03e0da56-190b-40ad-a80c-ea378c433f7f"
-  $userImpersonationPermissionType = "Scope"
 
   # Add API Permission: Azure Storage / user_impersonation
   az ad app permission add `
     --id $webAppId `
     --api $apiAppId `
-    --api-permissions "$userImpersonationPermissionId=$userImpersonationPermissionType"
+    --api-permissions "$userImpersonationPermissionId=Scope"
 
+  # Add API Permission: Azure Storage / user_impersonation
+  az ad app permission add `
+    --id $webAppId `
+    --api $apiAppId `
+    --api-permissions "$apiAppUserImpersonationId=Scope"
+
+  # Invoking "az ad app permission grant is needed to make the change effective.
   # Grant the permission. Defaults to 1 year.
   az ad app permission grant `
     --id $webAppId `
@@ -517,6 +554,8 @@ createWebAppRegistration
 ### 1.10.1. **Alt 1:** Use existing projects from this repo
 
 #### 1.10.1.1. Updating appsettings when using existing solution from this Git repo
+
+> Note: When running these scripts, make sure your terminal is in the git repo root folder.
 
 ```Powershell
 
