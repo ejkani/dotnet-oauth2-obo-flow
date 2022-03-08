@@ -1,6 +1,4 @@
-using System.Text;
-using ApiApp.Services;
-using Azure.Storage.Files.DataLake;
+using ApiApp.Extensions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -56,9 +54,23 @@ public class SqlController : ControllerBase
         AuthenticationResult res;
         try
         {
-            res = clnt
-                .AcquireTokenOnBehalfOf(new[] { synapseScope }, ua)
-                .ExecuteAsync().GetAwaiter().GetResult();
+            var isApp = User.IsAppOnly();
+
+            if (isApp)
+            {
+                var callerClaims = User.Claims.ToList();
+                var servicePrincipalObjectId = User.GetAzureAppServicePrincipalObjectId();
+
+                // Get token to resource on behalf of this Api.
+                res = await clnt.AcquireTokenForClient(new[] { synapseScope }).ExecuteAsync();
+            }
+            else
+            {
+                // Get token on behalf of user via delegated permissions
+                res = await clnt.AcquireTokenOnBehalfOf(new[] { synapseScope }, ua).ExecuteAsync();
+            }
+
+            
         }
         catch (Exception e)
         {
@@ -87,7 +99,7 @@ public class SqlController : ControllerBase
 
                 using (SqlCommand command = new SqlCommand($"SELECT * from {synapseView}", connection))
                 {
-                    using (SqlDataReader reader = command.ExecuteReader())
+                    using (SqlDataReader reader = await command.ExecuteReaderAsync())
                     {
                         while (reader.Read())
                         {

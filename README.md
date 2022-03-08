@@ -16,16 +16,16 @@ References:
 
 * All steps below are executed from the root folder (the same folder as this README file)
 
-## Todo's
+## 1.1. Todo's
 
 * [X] Set ApiApp's `"accessTokenAcceptedVersion": 2,` in manifest programatically.
 * [X] Add `oauth2-obo-flow-demo-api-msi-nn` to Ad Group.
 
-## 1.1. Intro
+## 1.2. Intro
 
 ![Obo Sequence Diagram](./Docs/Images/azure-app-file-demo.png)
 
-### 1.1.1. Admin Consents
+## 1.3. Admin Consents
 
 > Note that you need to have administration rights in your Tenant to grant admin consent.
 
@@ -43,17 +43,17 @@ with ID '<appId>' named '<appName>'.
 Send an interactive authorization request for this user and resource.
 ```
 
-#### 1.1.1.1. Setting Admin consent
+### 1.3.1. Setting Admin consent
 
 This will be done later, but this is showing where the Admin Consent is set for the Api we are creating.
 
 ![Admin Consent UI](./Docs/Images/azure-app-admin-consent.png)
 
-## 1.2. Log In To Azure And Set Your Default Subscription
+## 1.4. Log In To Azure And Set Your Default Subscription
 
 > Upgrade `az cli` with `az upgrade`, since some validation lies within the tool itself.
 
-### 1.2.1. Get your subscriptions
+### 1.4.1. Get your subscriptions
 
 ```Powershell
 
@@ -75,7 +75,7 @@ az account list --query "[].{name:name, subscriptionId:id}"
 
 ```
 
-### 1.2.2. Set your subscription to use
+### 1.4.2. Set your subscription to use
 
 ```Powershell
 
@@ -103,9 +103,9 @@ az account show
 
 ```
 
-## 1.3. Start setting variables we're going to use
+## 1.5. Creating Api and Web app with obo-flow
 
-### 1.3.1. Create simple functions for setting variables
+### 1.5.1. Create simple functions for setting variables
 
 ```Powershell
 
@@ -150,7 +150,7 @@ function setStorageVariables($containerName, $rootFolder)
 
 ```
 
-### 1.3.2. Execute above functions to set variables
+### 1.5.2. Execute above functions to set variables
 
 ```Powershell
 
@@ -164,7 +164,7 @@ setStorageVariables "myfscontainer" "Folder1"
 
 ```
 
-## 1.4. Start creating resources
+### 1.5.3. Start creating resources
 
 ```Powershell
 
@@ -213,7 +213,7 @@ createAzureStorage
 
 ```
 
-## 1.5. Creating Azure AD Group and adding you as a member
+### 1.5.4. Creating Azure AD Group and adding you as a member
 
 ```Powershell
 
@@ -227,33 +227,28 @@ function createAzureAdGroup()
   $global:adGroupForAccessObjectId = $(az ad group list --display-name $adGroupForAccess --query "[*].[objectId]" --output tsv)
 }
 
-function addCurrentUserToAdGroup()
+function addIdentitiesToAdAccessGroup()
 {
-  # Adding you to the created group
+  # Getting your object id
   $global:currentUserObjectId = $(az ad signed-in-user show --query "objectId" --output tsv)
 
+  # Adding you to the created group
   az ad group member add `
       --group $adGroupForAccessObjectId `
       --member-id $currentUserObjectId
 }
 
 createAzureAdGroup
-addCurrentUserToAdGroup
+addIdentitiesToAdAccessGroup
 
 ```
 
-### 1.5.1. (Optional) Remove current user from AD Group
+### 1.5.5. (Optional) List and/or Remove Current User From AD Group
 
 Use these commands when you want to test access.
 
 ```Powershell
 
-function removeCurrentUserFromAdGroup()
-{
-  az ad group member remove `
-      --group $adGroupForAccessObjectId `
-      --member-id $currentUserObjectId
-}
 
 function listMembersOfAdGroup()
 {
@@ -266,9 +261,19 @@ function listMembersOfAdGroup()
       --query "[].{objectId:objectId, userPrincipalName:userPrincipalName}" --out table
 }
 
-# List before removal
+# List members
 listMembersOfAdGroup
 
+```
+
+```Powershell
+
+function removeCurrentUserFromAdGroup()
+{
+  az ad group member remove `
+      --group $adGroupForAccessObjectId `
+      --member-id $currentUserObjectId
+}
 # Remove
 removeCurrentUserFromAdGroup
 
@@ -277,7 +282,7 @@ listMembersOfAdGroup
 
 ```
 
-## 1.6. Setting Access to Azure Storage files and folders
+### 1.5.6. Setting Access to Azure Storage files and folders
 
 ```Powershell
 
@@ -320,7 +325,7 @@ setAzureStorageAccess
 
 ```
 
-## 1.7. Adding logging and monitoring
+### 1.5.7. Adding logging and monitoring
 
 ```Powershell
 
@@ -354,7 +359,7 @@ createLogAndMonitoring
 
 ```
 
-## 1.8. Create Some App Services
+### 1.5.8. Create Some App Services
 
 Create an App Service Plan first
 
@@ -402,9 +407,7 @@ createAppServices
 
 ```
 
-## 1.9. Creating app identities
-
-### 1.9.1. Creating the ApiApp
+### 1.5.9. Creating the ApiApp
 
 ```Powershell
 
@@ -412,15 +415,11 @@ function createApiAppRegistration()
 {
   az ad app create `
       --display-name $apiAppMsi
-      # --identifier-uris $apiAppIdentifierUrl # NOTE: You can use fqdn's if you use your verified domain name.
-      # --reply-urls $apiAppLocalUrl $apiAppPublicUrl # TODO: Seems like it's not needed. Maybe when enabling login with Swagger UI ...
-      
 
   $global:apiAppObjectId            = $(az ad app list --display-name $apiAppMsi --query "[*].[objectId]" --output tsv)
   $global:apiAppId                  = $(az ad app list --display-name $apiAppMsi --query "[*].[appId]" --output tsv)
-  $global:apiAppUserImpersonationId = $(az ad sp show --id $apiAppId --query "oauth2Permissions[?value=='user_impersonation'].id | [0]")
 
-  $apiAppIdentifierUrl = "api://$apiAppId"
+  $global:apiAppIdentifierUrl = "api://$apiAppId"
 
   # Update the ApplicationUrl Id, since we don't use a domain name, but need to use the AppId.
   az ad app update `
@@ -432,7 +431,17 @@ function createApiAppRegistration()
   az ad sp create `
     --id $apiAppId
 
+  # Wait for some seconds for the app registration to propagate
+  echo "Waiting for app registration to propegate."
+  Start-Sleep -Seconds 15
+
   $global:apiAppSpObjectId = $(az ad sp list --display-name $apiAppMsi --query "[*].[objectId]" --output tsv)
+  $global:apiAppUserImpersonationId = $(az ad sp show --id $apiAppId --query "oauth2Permissions[?value=='user_impersonation'].id | [0]")
+  
+  # Add the Api app to the Ad Group to be able to query the sql database, since it has Ad Auth.
+  az ad group member add `
+      --group $adGroupForAccessObjectId `
+      --member-id $apiAppSpObjectId
 }
 
 createApiAppRegistration
@@ -455,9 +464,12 @@ function setApiAppPermissions()
     --api $azureStorageResourceAppId `
     --api-permissions "$azureStoragePermissionId=Scope"
 
-  # TODO: Add API Permission: Azure Storage / app_impersonation
+  # TODO: Add API Permission: Azure Storage / app_impersonation when it is available
   # ...
-  
+
+  # Wait for some seconds for the app grants to propagate
+  echo "Waiting for app grants to propegate."
+  Start-Sleep -Seconds 15
 
   # Doing the ADMIN CONSENT (You need to have admin rights to do this)
   az ad app permission admin-consent --id $apiAppId
@@ -472,7 +484,7 @@ setApiAppPermissions
 
 ```
 
-### 1.9.2. Creating the WebApp
+### 1.5.10. Creating the WebApp
 
 ```Powershell
 
@@ -491,33 +503,26 @@ function createWebAppRegistration()
   az ad sp create `
     --id $webAppId
 
-  # TODO: Uncheck ID Token option when creating web app
-  # ...
+  # Wait for some seconds for the app registration to propagate
+  echo "Waiting for app registration to propegate."
+  Start-Sleep -Seconds 15
 
-  # TODO: Remove Scopes/user_impersonation ??
-  # ...
-
-   # Define access to the ApiApp
-  $userImpersonationPermissionId   = "03e0da56-190b-40ad-a80c-ea378c433f7f"
-
-  # Add API Permission: Azure Storage / user_impersonation
-  az ad app permission add `
-    --id $webAppId `
-    --api $apiAppId `
-    --api-permissions "$userImpersonationPermissionId=Scope"
-
-  # Add API Permission: Azure Storage / user_impersonation
+  # Define access to the ApiApp.
+  # Add API Permission created earlier: Api App / user_impersonation
   az ad app permission add `
     --id $webAppId `
     --api $apiAppId `
     --api-permissions "$apiAppUserImpersonationId=Scope"
+
+  # Wait for some seconds for the app grants to propagate
+  echo "Waiting for app grants to propegate."
+  Start-Sleep -Seconds 15
 
   # Invoking "az ad app permission grant is needed to make the change effective.
   # Grant the permission. Defaults to 1 year.
   az ad app permission grant `
     --id $webAppId `
     --api $apiAppId
-
 
   # Updating the Apps created, since the "az webapp" command has some limitations.
   # Creating a Json object to use in our MS Graph Ad-App Patch call.
@@ -541,19 +546,24 @@ function createWebAppRegistration()
 
   # Verify the correct SPA Redirect Url
   az rest --method GET --uri "https://graph.microsoft.com/v1.0/applications/$webAppObjectId"
+
+  # NOTE:
+  # Should not expose secrets like this in a real environment, but doing it simple in this demo.
+  # This secret is "never" to be used in a web app, but we'll only use it to test Client Credential flow from curl and/or Postman.
+  $global:webAppSecretOnlyToTestClientCredentials = $(az ad app credential reset --id $webAppObjectId --credential-description "M2M demo" --append --query "password" --output tsv)
 }
 
 createWebAppRegistration
 
 ```
 
-## 1.10. Chose to create apps from scratch or use existing apps from this repo
+### 1.5.11. Chose to create apps from scratch or use existing apps from this repo
 
 > The apps are already created in this repository, but if you would like to start fresh, choose `Alt 1`.
 
-### 1.10.1. **Alt 1:** Use existing projects from this repo
+#### 1.5.11.1. **Alt 1:** Use existing projects from this repo
 
-#### 1.10.1.1. Updating appsettings when using existing solution from this Git repo
+##### 1.5.11.1.1. Updating appsettings when using existing solution from this Git repo
 
 > Note: When running these scripts, make sure your terminal is in the git repo root folder.
 
@@ -594,7 +604,7 @@ updateExistingSourceCode
 
 ```
 
-### 1.10.2. **Alt 2:** Creating the app projects from scratch
+##### 1.5.11.1.2. **Alt 2:** Creating the app projects from scratch
 
 If you created the projects from scratch, remember that you also need to write the application code as well (or copy from this repo)...
 
@@ -669,8 +679,7 @@ createNewAppVsProjects
 
 ```
 
-
-## 1.11. Create a Json file with test data
+### 1.5.12. Create a Json file with test data
 
 ```Powershell
 
@@ -704,7 +713,7 @@ createTestData
 
 ```
 
-## 1.12. Publish Web App with zip-deployment
+### 1.5.13. Publish Web App with zip-deployment
 
 ```Powershell
 
@@ -736,7 +745,7 @@ publishWebApp
 
 ```
 
-## 1.13. Publish Api App with zip-deployment
+### 1.5.14. Publish Api App with zip-deployment
 
 ```Powershell
 
@@ -768,7 +777,7 @@ publishApiApp
 
 ```
 
-## 1.14. Save used variables
+### 1.5.15. Save used variables
 
 Saving some key variables, so we easily can clean up our demo resources later
 
@@ -796,7 +805,7 @@ saveDemoData
 
 ```
 
-### 1.14.1. Deleting resources
+### 1.5.16. Deleting resources
 
 ```Powershell
 
@@ -819,8 +828,391 @@ deleteDemoResources
 
 > This is somewhat lengthy example, but it sets up all the bits and pieces for you when creating apps with auth in Azure. Good luck!
 
-## Continue with Synapse Sql
+### 1.5.17. Next steps
 
-Continue with [**creating a Synapse Sql OBO FLow**](./synapse-obo-flow.md)
+The api and web-app should now be working. If you start the api and web application locally on your machine, you should be able to get the content of the demo file from the Azure Stroage you recently created, with your interactive user as the identity accessing the native file on Azure Data Lake.
 
-.
+## 1.6. Optional: Continue with Synapse Sql
+
+### 1.6.1. Make a helper-function to crate passwords
+
+```Powershell
+
+function createPassword {
+    param (
+        [Parameter(Mandatory)]
+        [ValidateRange(4,[int]::MaxValue)]
+        [int] $length,
+        [int] $upper = 1,
+        [int] $lower = 1,
+        [int] $numeric = 1,
+        [int] $special = 1
+    )
+    if($upper + $lower + $numeric + $special -gt $length) {
+        throw "number of upper/lower/numeric/special char must be lower or equal to length"
+    }
+    $uCharSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    $lCharSet = "abcdefghijklmnopqrstuvwxyz"
+    $nCharSet = "0123456789"
+    $sCharSet = "/*-+,!?=()@;:._"
+    $charSet = ""
+    if($upper -gt 0) { $charSet += $uCharSet }
+    if($lower -gt 0) { $charSet += $lCharSet }
+    if($numeric -gt 0) { $charSet += $nCharSet }
+    if($special -gt 0) { $charSet += $sCharSet }
+    
+    $charSet = $charSet.ToCharArray()
+    $rng = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+    $bytes = New-Object byte[]($length)
+    $rng.GetBytes($bytes)
+ 
+    $result = New-Object char[]($length)
+    for ($i = 0 ; $i -lt $length ; $i++) {
+        $result[$i] = $charSet[$bytes[$i] % $charSet.Length]
+    }
+    $password = (-join $result)
+    $valid = $true
+    if($upper   -gt ($password.ToCharArray() | Where-Object {$_ -cin $uCharSet.ToCharArray() }).Count) { $valid = $false }
+    if($lower   -gt ($password.ToCharArray() | Where-Object {$_ -cin $lCharSet.ToCharArray() }).Count) { $valid = $false }
+    if($numeric -gt ($password.ToCharArray() | Where-Object {$_ -cin $nCharSet.ToCharArray() }).Count) { $valid = $false }
+    if($special -gt ($password.ToCharArray() | Where-Object {$_ -cin $sCharSet.ToCharArray() }).Count) { $valid = $false }
+ 
+    if(!$valid) {
+         $password = createPassword $length $upper $lower $numeric $special
+    }
+    return $password
+}
+
+# length 20, 1 upper, 1 lower, 1 number, 1 special
+# createPassword 32 1 1 1 1
+
+```
+
+### 1.6.2. Starting by extending our variables
+
+```Powershell
+
+function setSynapseVariables()
+{
+  $global:adGroupForSynapseAdmin = "$myDemoNamePrefix-synapseadmingroup-$rand"
+  $global:synapseName            = "${myDemoNamePrefix}-syn-$rand"
+  $global:synapseDbName          = "demo_ondemand"
+  $global:synapseSqlView         = "demo.testdata_json"
+  $global:synapseAdminName       = "synapseadmin-$rand"
+  $global:synapseGrantScriptName = "synapseSqlGrants.sql"
+  $global:synapseAdminPassword   = $(createPassword 32 1 1 1 1)
+  $global:synapseFileSystem      = "synapsefs"
+}
+
+setSynapseVariables
+
+```
+
+### 1.6.3. Creating Azure AD Group for SqlAdmin
+
+```Powershell
+
+function createAzureAdGroupForSynapseAdmin()
+{
+  # ---------------------------------------------------------------------
+  # Create Azure AD Group with members
+  # ---------------------------------------------------------------------
+  # Create an AD Group to manage ACL Access. TODO: Move to own chapter
+  az ad group create --display-name $adGroupForSynapseAdmin --mail-nickname $adGroupForSynapseAdmin
+  $global:adGroupForSynapseAdminObjectId = $(az ad group list --display-name $adGroupForSynapseAdmin --query "[*].[objectId]" --output tsv)
+}
+
+function addIdentitiesToAdGroupForSynapseAdmin()
+{
+  # Adding you to the created group
+  $global:currentUserObjectId = $(az ad signed-in-user show --query "objectId" --output tsv)
+
+  # Add you in the Ad Group
+  az ad group member add `
+      --group $adGroupForSynapseAdminObjectId `
+      --member-id $currentUserObjectId
+}
+
+createAzureAdGroupForSynapseAdmin
+addIdentitiesToAdGroupForSynapseAdmin
+
+```
+
+### 1.6.4. Create Synapse Storage
+
+```Powershell
+
+function createSynapseStorage()
+{
+  # ---------------------------------------------------------------------
+  # Create the file system (Container)
+  # ---------------------------------------------------------------------
+  az storage container create `
+      --name $synapseFileSystem `
+      --account-name $storageAccountName `
+      --public-access off `
+      --resource-group $resourceGroup
+
+}
+
+createSynapseStorage
+
+```
+
+### 1.6.5. Create Azure Synapse
+
+```Powershell
+
+function createSynapse()
+{
+  # Create Synapse Workspace
+  az synapse workspace create `
+    --name  $synapseName `
+    --resource-group $resourceGroup `
+    --sql-admin-login-password $synapseAdminPassword `
+    --sql-admin-login-user $synapseAdminName `
+    --storage-account $storageAccountName `
+    --file-system $synapseFileSystem `
+    --location $location
+
+  $global:synapseWorkspaceDev = $(az synapse workspace show --name $synapseName --resource-group $resourceGroup --query "connectivityEndpoints.dev" --output tsv)
+  $global:synapseSqlName = $(az synapse workspace show --name $synapseName --resource-group $resourceGroup --query "connectivityEndpoints.sql" --output tsv)
+  $global:synapseSqlOnDemandName = $(az synapse workspace show --name $synapseName --resource-group $resourceGroup --query "connectivityEndpoints.sqlOnDemand" --output tsv)
+
+  # Extract your IP address by calling the Synapse Dev endpoint
+  $curlResponse = $(curl -sb -H "Accept: application/json" "$synapseWorkspaceDev") | ConvertFrom-Json -Depth 2
+  $clientIpAddress = $curlResponse.message -replace "Client Ip address : "
+
+  # Set firewall rule for your current IP
+  az synapse workspace firewall-rule create `
+    --end-ip-address $clientIpAddress `
+    --start-ip-address $clientIpAddress `
+    --name "Allow Client IP" `
+    --resource-group $resourceGroup `
+    --workspace-name $synapseName
+
+  az synapse sql ad-admin show `
+    --resource-group $resourceGroup `
+    --workspace-name $synapseName
+
+  # Now it it possible to log into the Synapse Sql Server,
+  # e.g. via Azure Data Studio.
+
+  # # TODO: This does not work p.t. 2021-12-21
+  # az synapse sql ad-admin create `
+  #   --display-name $synapseAdminName `
+  #   --object-id $adGroupForSynapseAdminObjectId `
+  #   --resource-group $resourceGroup `
+  #   --workspace-name $synapseName
+
+  # Add Azure Sql to the Api Permissions
+  $azureSqlResourceAppId       = "022907d3-0f1b-48f7-badc-1ba6abab6d66"
+  $azureSqlUserImpersonationId = "c39ef2d1-04ce-46dc-8b5f-e9a5c60f0fc9"
+  $azureSqlAppImpersonationId  = "efe4d732-bfbb-4617-8a77-349a9d67c720"
+
+  # Add API Permission: Azure SQL Database / user_impersonation
+  az ad app permission add `
+    --id $apiAppId `
+    --api $azureSqlResourceAppId `
+    --api-permissions "$azureSqlUserImpersonationId=Scope"
+
+  # Add API Permission: Azure SQL Database / app_impersonation
+  az ad app permission add `
+    --id $apiAppId `
+    --api $azureSqlResourceAppId `
+    --api-permissions "$azureSqlAppImpersonationId=Role"
+
+  # Wait for some seconds for the app permissions to propagate
+  echo "Waiting for app permissions to propegate."
+  Start-Sleep -Seconds 15 
+
+  # Doing the ADMIN CONSENT (You need to have admin rights to do this)
+  az ad app permission admin-consent --id $apiAppId
+
+}
+
+createSynapse
+
+```
+
+### 1.6.6. Update Solution With Synapse properties
+
+```Powershell
+
+function updateSourceCodeWithSynapseProperties()
+{
+  # Setting the WebApp first
+  $apiAppSettings = (Get-Content ("./Source/ApiApp/appsettings.json") | ConvertFrom-Json)
+
+  # Set values
+  $apiAppSettings.MySynapseSql.Server = $synapseSqlOnDemandName
+  $apiAppSettings.MySynapseSql.Database = $synapseDbName
+  $apiAppSettings.MySynapseSql.View = $synapseSqlView
+
+  # Write back the appsettings.json file
+  $apiAppSettings | ConvertTo-Json -Depth 10 | Out-File "./Source/ApiApp/appsettings.json" -Force
+}
+
+updateSourceCodeWithSynapseProperties
+
+```
+
+### 1.6.7. Create Sql Script to grant our AD Group access
+
+Run the script created below in your Sql Tool, e.g. Azure Data Studio. You'll find the Sql Server connection in the top of this script.
+
+```Powershell
+
+function createSynapseSqlGrantScript()
+{
+    $testFileFullDfsPath = "https://${storageAccountName}.dfs.core.windows.net/${storageContainerName}/${storageTestFilePath}"
+    $global:sqlGrantScript = "
+    -- Log in to this sql server db
+    -- sql server:   $synapseSqlOnDemandName
+    -- Log in with your Azure AD user and run the below script
+
+    IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = '${synapseDbName}') CREATE DATABASE [${synapseDbName}]
+    GO
+
+    -- Set collation
+    USE [${synapseDbName}]
+    GO
+
+    IF NOT EXISTS(SELECT c.Collation FROM (SELECT DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS Collation) c  
+    WHERE c.Collation = 'Latin1_General_100_BIN2_UTF8')
+    BEGIN
+        alter database current collate Latin1_General_100_BIN2_UTF8
+    END
+    GO
+
+    -- Grant regular users access
+    CREATE USER [${adGroupForAccess}] FROM EXTERNAL PROVIDER;
+    ALTER ROLE db_datareader ADD MEMBER [${adGroupForAccess}];
+    GO
+
+    -- Grant Ad Group permission to use the bulk load statement
+    GRANT ADMINISTER DATABASE BULK OPERATIONS TO [${adGroupForAccess}];
+    GO
+
+    -- https://docs.microsoft.com/en-us/azure/synapse-analytics/sql/query-json-files
+
+    CREATE SCHEMA demo
+    GO
+
+    CREATE OR ALTER VIEW demo.testdata_json 
+        AS
+          select top 10 *
+    from openrowset(
+            bulk '${testFileFullDfsPath}',
+            format = 'csv',
+            fieldterminator ='0x0b',
+            fieldquote = '0x0b'
+        ) with (doc nvarchar(max)) as rows
+
+    GO
+
+    -- Select from the VIew
+    -- select * from demo.testdata_json
+
+    -- TODO:
+    -- SELECT * FROM OPENROWSET(BULK '${testFileFullDfsPath}', 
+    -- FORMAT = 'CSV') AS DATA
+
+    "
+
+    $sqlGrantScript |  Out-File ( New-Item -Path $synapseGrantScriptName -Force )
+
+    echo "Sql script created: ${synapseGrantScriptName}"
+    echo "Open Azure Data Studio or Sql Server Management Studio and execute tihis script."
+    echo "Sql server: ${synapseSqlOnDemandName}"
+}
+
+createSynapseSqlGrantScript
+
+```
+
+Open database with **Azure Data Studio**:
+
+![Azure Data Studio Connection](./Docs/Images/azure-data-studio-add-connection.png)
+
+1) Use the created **Synapse Sql address** created
+2) Use **MFA** (Multi Factor Auth)
+3) Select **you account**
+4) Select **your tenant**
+
+Execute the **created script**:
+
+![Azure Data Studio Script](./Docs/Images/azure-data-studio-new-query.png)
+
+1) Right click the server
+2) Choose **New Query** and paste the Synapse Sql script created earlier.
+
+Result after execution:
+
+![Azure Data Studio Script](./Docs/Images/azure-data-studio-executed-script.png)
+
+1) Click **Run** to execute script
+2) Right click and refresh teh database folder, and the new database should be there. You can now query the **view** that was created.
+
+### Test Web app with Synapse Sql
+
+You should now be able to start the Api and Web app and go to the **Get Sql Data** page and query data from Synapse, which again gets the data from Azure Data Lake.
+
+![Web App Synapse Demo](./Docs/Images/azure-app-synapsesql-demo.png)
+
+1) Retrieved data from Azure Synapse Sql with database view connected to a Azure Data Lake file. (PS: Content is not parsed)
+
+## Calling the Api as an Application
+
+Call the Api as a **Deamon app** with client credentials.
+
+This example explicitly gets the `access_token` for demo purposes, but you could use the integrated authorization methods in Postman (OAuth2 / Client Credential flow) as well.
+
+```Powershell
+
+function getAccessTokenForApplication()
+{
+  $tokenUrl = "https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token"
+
+  # Adding a curl request here as well, for those interested.
+  $global:curlTokenRequest = "curl --location --request GET $tokenUrl " +
+                        "--header Content-Type: application/x-www-form-urlencoded " +
+                        "--data-urlencode grant_type=client_credentials " +
+                        "--data-urlencode client_id=${webAppId} " +
+                        "--data-urlencode scope=${apiAppIdentifierUrl}/.default " +
+                        "--data-urlencode client_secret=${webAppSecretOnlyToTestClientCredentials} "
+
+  $requestHeaders = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $requestHeaders.Add("Content-Type", "application/x-www-form-urlencoded")
+
+  $requestBody = "grant_type=client_credentials&client_id=${webAppId}&scope=${apiAppIdentifierUrl}/.default&client_secret=${webAppSecretOnlyToTestClientCredentials}"
+
+  $tokenResponse = Invoke-RestMethod $tokenUrl -Method 'GET' -Headers $requestHeaders -Body $requestBody
+  $global:webAppAccessToken = $tokenResponse.access_token
+}
+
+getAccessTokenForApplication
+
+```
+
+```Powershell
+
+function callApiAsAnApplication()
+{
+  $requestHeaders = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $requestHeaders.Add("Authorization", "Bearer ${webAppAccessToken}")
+
+  $apiResponse = Invoke-RestMethod ${apiAppLocalUrl}/sqlData -Method 'GET' -Headers $requestHeaders -Body $requestBody
+
+  echo $apiResponse
+}
+
+callApiAsAnApplication
+
+```
+
+PowerShell api request result:
+
+![PowerShell Api Request](./Docs/Images/powershell-call-api-as-application-result.png)
+
+/
