@@ -16,16 +16,11 @@ References:
 
 * All steps below are executed from the root folder (the same folder as this README file)
 
-## 1.1. Todo's
-
-* [X] Set ApiApp's `"accessTokenAcceptedVersion": 2,` in manifest programatically.
-* [X] Add `oauth2-obo-flow-demo-api-msi-nn` to Ad Group.
-
-## 1.2. Intro
+## 1.1. Intro
 
 ![Obo Sequence Diagram](./Docs/Images/azure-app-file-demo.png)
 
-## 1.3. Admin Consents
+## 1.2. Admin Consents
 
 > Note that you need to have administration rights in your Tenant to grant admin consent.
 
@@ -43,17 +38,17 @@ with ID '<appId>' named '<appName>'.
 Send an interactive authorization request for this user and resource.
 ```
 
-### 1.3.1. Setting Admin consent
+### 1.2.1. Setting Admin consent
 
 This will be done later, but this is showing where the Admin Consent is set for the Api we are creating.
 
 ![Admin Consent UI](./Docs/Images/azure-app-admin-consent.png)
 
-## 1.4. Log In To Azure And Set Your Default Subscription
+## 1.3. Log In To Azure And Set Your Default Subscription
 
 > Upgrade `az cli` with `az upgrade`, since some validation lies within the tool itself.
 
-### 1.4.1. Get your subscriptions
+### 1.3.1. Get your subscriptions
 
 ```Powershell
 
@@ -75,7 +70,7 @@ az account list --query "[].{name:name, subscriptionId:id}"
 
 ```
 
-### 1.4.2. Set your subscription to use
+### 1.3.2. Set your subscription to use
 
 ```Powershell
 
@@ -103,9 +98,9 @@ az account show
 
 ```
 
-## 1.5. Creating Api and Web app with obo-flow
+## 1.4. Creating Api and Web app with obo-flow
 
-### 1.5.1. Create simple functions for setting variables
+### 1.4.1. Create simple functions for setting variables
 
 ```Powershell
 
@@ -150,7 +145,7 @@ function setStorageVariables($containerName, $rootFolder)
 
 ```
 
-### 1.5.2. Execute above functions to set variables
+### 1.4.2. Execute above functions to set variables
 
 ```Powershell
 
@@ -164,7 +159,7 @@ setStorageVariables "myfscontainer" "Folder1"
 
 ```
 
-### 1.5.3. Start creating resources
+### 1.4.3. Start creating resources
 
 ```Powershell
 
@@ -213,7 +208,7 @@ createAzureStorage
 
 ```
 
-### 1.5.4. Creating Azure AD Group and adding you as a member
+### 1.4.4. Creating Azure AD Group and adding you as a member
 
 ```Powershell
 
@@ -243,7 +238,7 @@ addIdentitiesToAdAccessGroup
 
 ```
 
-### 1.5.5. (Optional) List and/or Remove Current User From AD Group
+### 1.4.5. (Optional) List and/or Remove Current User From AD Group
 
 Use these commands when you want to test access.
 
@@ -282,7 +277,7 @@ listMembersOfAdGroup
 
 ```
 
-### 1.5.6. Setting Access to Azure Storage files and folders
+### 1.4.6. Setting Access to Azure Storage files and folders
 
 ```Powershell
 
@@ -325,7 +320,7 @@ setAzureStorageAccess
 
 ```
 
-### 1.5.7. Adding logging and monitoring
+### 1.4.7. Adding logging and monitoring
 
 ```Powershell
 
@@ -359,7 +354,7 @@ createLogAndMonitoring
 
 ```
 
-### 1.5.8. Create Some App Services
+### 1.4.8. Create Some App Services
 
 Create an App Service Plan first
 
@@ -407,7 +402,7 @@ createAppServices
 
 ```
 
-### 1.5.9. Creating the ApiApp
+### 1.4.9. Creating the ApiApp
 
 ```Powershell
 
@@ -484,7 +479,7 @@ setApiAppPermissions
 
 ```
 
-### 1.5.10. Creating the WebApp
+### 1.4.10. Creating the WebApp
 
 ```Powershell
 
@@ -557,13 +552,13 @@ createWebAppRegistration
 
 ```
 
-### 1.5.11. Chose to create apps from scratch or use existing apps from this repo
+### 1.4.11. Chose to create apps from scratch or use existing apps from this repo
 
 > The apps are already created in this repository, but if you would like to start fresh, choose `Alt 1`.
 
-#### 1.5.11.1. **Alt 1:** Use existing projects from this repo
+#### 1.4.11.1. **Alt 1:** Use existing projects from this repo
 
-##### 1.5.11.1.1. Updating appsettings when using existing solution from this Git repo
+##### 1.4.11.1.1. Updating appsettings when using existing solution from this Git repo
 
 > Note: When running these scripts, make sure your terminal is in the git repo root folder.
 
@@ -604,7 +599,7 @@ updateExistingSourceCode
 
 ```
 
-##### 1.5.11.1.2. **Alt 2:** Creating the app projects from scratch
+##### 1.4.11.1.2. **Alt 2:** Creating the app projects from scratch
 
 If you created the projects from scratch, remember that you also need to write the application code as well (or copy from this repo)...
 
@@ -679,7 +674,7 @@ createNewAppVsProjects
 
 ```
 
-### 1.5.12. Create a Json file with test data
+### 1.4.12. Create a Json file with test data
 
 ```Powershell
 
@@ -713,7 +708,7 @@ createTestData
 
 ```
 
-### 1.5.13. Publish Web App with zip-deployment
+### 1.4.13. Publish Web App with zip-deployment
 
 ```Powershell
 
@@ -745,7 +740,7 @@ publishWebApp
 
 ```
 
-### 1.5.14. Publish Api App with zip-deployment
+### 1.4.14. Publish Api App with zip-deployment
 
 ```Powershell
 
@@ -777,7 +772,7 @@ publishApiApp
 
 ```
 
-### 1.5.15. Save used variables
+### 1.4.15. Save used variables
 
 Saving some key variables, so we easily can clean up our demo resources later
 
@@ -805,7 +800,7 @@ saveDemoData
 
 ```
 
-### 1.5.16. Deleting resources
+### 1.4.16. Deleting resources
 
 ```Powershell
 
@@ -828,13 +823,13 @@ deleteDemoResources
 
 > This is somewhat lengthy example, but it sets up all the bits and pieces for you when creating apps with auth in Azure. Good luck!
 
-### 1.5.17. Next steps
+### 1.4.17. Next steps
 
 The api and web-app should now be working. If you start the api and web application locally on your machine, you should be able to get the content of the demo file from the Azure Stroage you recently created, with your interactive user as the identity accessing the native file on Azure Data Lake.
 
-## 1.6. Optional: Continue with Synapse Sql
+## 1.5. Optional: Continue with Synapse Sql
 
-### 1.6.1. Make a helper-function to crate passwords
+### 1.5.1. Make a helper-function to crate passwords
 
 ```Powershell
 
@@ -888,7 +883,7 @@ function createPassword {
 
 ```
 
-### 1.6.2. Starting by extending our variables
+### 1.5.2. Starting by extending our variables
 
 ```Powershell
 
@@ -908,7 +903,7 @@ setSynapseVariables
 
 ```
 
-### 1.6.3. Creating Azure AD Group for SqlAdmin
+### 1.5.3. Creating Azure AD Group for SqlAdmin
 
 ```Powershell
 
@@ -938,7 +933,7 @@ addIdentitiesToAdGroupForSynapseAdmin
 
 ```
 
-### 1.6.4. Create Synapse Storage
+### 1.5.4. Create Synapse Storage
 
 ```Powershell
 
@@ -959,7 +954,7 @@ createSynapseStorage
 
 ```
 
-### 1.6.5. Create Azure Synapse
+### 1.5.5. Create Azure Synapse
 
 ```Powershell
 
@@ -1035,7 +1030,7 @@ createSynapse
 
 ```
 
-### 1.6.6. Update Solution With Synapse properties
+### 1.5.6. Update Solution With Synapse properties
 
 ```Powershell
 
@@ -1057,7 +1052,7 @@ updateSourceCodeWithSynapseProperties
 
 ```
 
-### 1.6.7. Create Sql Script to grant our AD Group access
+### 1.5.7. Create Sql Script to grant our AD Group access
 
 Run the script created below in your Sql Tool, e.g. Azure Data Studio. You'll find the Sql Server connection in the top of this script.
 
@@ -1154,7 +1149,7 @@ Result after execution:
 1) Click **Run** to execute script
 2) Right click and refresh teh database folder, and the new database should be there. You can now query the **view** that was created.
 
-### Test Web app with Synapse Sql
+### 1.5.8. Test Web app with Synapse Sql
 
 You should now be able to start the Api and Web app and go to the **Get Sql Data** page and query data from Synapse, which again gets the data from Azure Data Lake.
 
@@ -1162,7 +1157,7 @@ You should now be able to start the Api and Web app and go to the **Get Sql Data
 
 1) Retrieved data from Azure Synapse Sql with database view connected to a Azure Data Lake file. (PS: Content is not parsed)
 
-## Calling the Api as an Application
+## 1.6. Calling the Api as an Application
 
 Call the Api as a **Deamon app** with client credentials.
 
