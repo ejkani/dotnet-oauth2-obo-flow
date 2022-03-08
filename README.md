@@ -554,7 +554,7 @@ createWebAppRegistration
 
 ### 1.4.11. Chose to create apps from scratch or use existing apps from this repo
 
-> The apps are already created in this repository, but if you would like to start fresh, choose `Alt 1`.
+> The apps are already created in this repository, but if you would like to start fresh, choose `Alt 2`.
 
 #### 1.4.11.1. **Alt 1:** Use existing projects from this repo
 
