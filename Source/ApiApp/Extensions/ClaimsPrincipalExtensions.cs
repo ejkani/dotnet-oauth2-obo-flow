@@ -17,22 +17,22 @@ namespace ApiApp.Extensions
             return isAppOnly;
         }
 
-        public static string GetAzureAppServicePrincipalObjectId(this ClaimsPrincipal principal)
+        public static string? GetAzureAppServicePrincipalObjectId(this ClaimsPrincipal principal)
         {
             ArgumentNullException.ThrowIfNull(principal);
 
             var objectId = principal.FindFirst(ClaimConstants.ObjectId)?.Value;
 
-            return objectId ?? string.Empty;
+            return objectId;
         }
 
-        public static string GetAzureAppId(this ClaimsPrincipal principal)
+        public static string? GetAzureAppId(this ClaimsPrincipal principal)
         {
             ArgumentNullException.ThrowIfNull(principal);
 
-            var appId = principal.FindFirst("appid")?.Value;
+            var appId = principal.FindFirst("appid")?.Value ?? principal.FindFirst("azp")?.Value;
 
-            return appId ?? string.Empty;
+            return appId;
         }
     }
 }
